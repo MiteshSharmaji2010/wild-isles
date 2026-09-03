@@ -1,7 +1,7 @@
 // ============================================================
 // WILD ISLES
 // VEYRA ISLAND
-// MAIN GAME ENGINE v0.8
+// MAIN GAME ENGINE v0.9
 //
 // Scene
 // Camera
@@ -12,6 +12,7 @@
 // Environment
 // Player
 // Survival
+// Day / Night
 // HUD
 // Loading
 // Mouse Camera
@@ -38,6 +39,9 @@ import { Player }
 import { SurvivalSystem }
     from "./survival.js";
 
+import { DayNightSystem }
+    from "./daynight.js";
+
 
 // ============================================================
 // GAME CLASS
@@ -60,6 +64,7 @@ class WildIslesGame {
         this.environment = null;
         this.player = null;
         this.survival = null;
+        this.dayNight = null;
 
         // =====================================================
         // CLOCK
@@ -108,6 +113,8 @@ class WildIslesGame {
 
         this.worldTime = 8.0;
 
+        // Kept for compatibility with previous system.
+        // DayNightSystem now controls the actual day/night cycle.
         this.dayLength = 600;
 
         // =====================================================
@@ -212,21 +219,28 @@ class WildIslesGame {
             this.createEnvironment();
 
             this.setLoading(
-                78,
+                76,
                 "Creating Kian..."
             );
 
             this.createPlayer();
 
             this.setLoading(
-                86,
+                84,
                 "Preparing survival system..."
             );
 
             this.createSurvival();
 
             this.setLoading(
-                92,
+                89,
+                "Creating day and night..."
+            );
+
+            this.createDayNight();
+
+            this.setLoading(
+                94,
                 "Connecting controls..."
             );
 
@@ -410,6 +424,9 @@ class WildIslesGame {
             hemisphere
         );
 
+        this.hemisphereLight =
+            hemisphere;
+
 
         // ====================================================
         // SUN
@@ -480,6 +497,9 @@ class WildIslesGame {
         this.scene.add(
             fill
         );
+
+        this.fillLight =
+            fill;
 
         console.log(
             "Lighting created"
@@ -585,6 +605,30 @@ class WildIslesGame {
 
         console.log(
             "Survival connected"
+        );
+    }
+
+
+    // ========================================================
+    // DAY / NIGHT
+    // ========================================================
+
+    createDayNight() {
+
+        if (!this.scene) {
+
+            throw new Error(
+                "Scene missing for Day/Night System."
+            );
+        }
+
+        this.dayNight =
+            new DayNightSystem(
+                this.scene
+            );
+
+        console.log(
+            "Day/Night connected"
         );
     }
 
@@ -888,6 +932,10 @@ class WildIslesGame {
                         1.5
                     )
                 );
+
+                this.mobileMode =
+                    window.innerWidth <= 900 ||
+                    "ontouchstart" in window;
             }
         );
     }
@@ -1073,6 +1121,29 @@ class WildIslesGame {
 
     updateWorldTime(deltaTime) {
 
+        // DayNightSystem is now responsible
+        // for the actual time progression.
+
+        if (
+            this.dayNight
+        ) {
+
+            this.day =
+                this.dayNight.day || this.day;
+
+            this.worldTime =
+                this.dayNight.timeOfDay ??
+                this.worldTime;
+
+            this.updateWorldUI();
+
+            return;
+        }
+
+        // ====================================================
+        // FALLBACK
+        // ====================================================
+
         this.worldTime +=
             deltaTime *
             (24 / this.dayLength);
@@ -1093,7 +1164,7 @@ class WildIslesGame {
 
 
     // ========================================================
-    // SUN
+    // OLD SUN FALLBACK
     // ========================================================
 
     updateSun() {
@@ -1152,7 +1223,7 @@ class WildIslesGame {
 
     updateWorldUI() {
 
-        const worldTime =
+        const worldTimeElement =
             document.getElementById(
                 "world-time"
             );
@@ -1163,7 +1234,22 @@ class WildIslesGame {
             );
 
         if (
-            worldTime
+            this.dayNight
+        ) {
+
+            const formattedTime =
+                this.dayNight.getFormattedTime();
+
+            if (
+                worldTimeElement
+            ) {
+
+                worldTimeElement.textContent =
+                    `DAY ${this.day} • ${formattedTime}`;
+            }
+
+        } else if (
+            worldTimeElement
         ) {
 
             const hour =
@@ -1195,7 +1281,7 @@ class WildIslesGame {
                     "0"
                 );
 
-            worldTime.textContent =
+            worldTimeElement.textContent =
                 `DAY ${this.day} • ${formattedHour}:${formattedMinute}`;
         }
 
@@ -1329,9 +1415,6 @@ class WildIslesGame {
                 const temp =
                     status.temperature;
 
-                // Convert internal 0-100
-                // to readable Celsius-like value
-
                 const celsius =
                     Math.round(
                         -10 +
@@ -1375,8 +1458,26 @@ class WildIslesGame {
                     ` | H ${status.hunger} T ${status.thirst}`;
             }
 
+            let dayNightText = "";
+
+            if (
+                this.dayNight
+            ) {
+
+                const formattedTime =
+                    this.dayNight.getFormattedTime();
+
+                const night =
+                    typeof this.dayNight.isNight ===
+                    "function" &&
+                    this.dayNight.isNight();
+
+                dayNightText =
+                    ` | ${formattedTime}${night ? " NIGHT" : " DAY"}`;
+            }
+
             debug.textContent =
-                `X ${info.x} | Y ${info.y} | Z ${info.z} | Slope ${info.slope}°${survivalText}`;
+                `X ${info.x} | Y ${info.y} | Z ${info.z} | Slope ${info.slope}°${survivalText}${dayNightText}`;
         }
     }
 
@@ -1493,7 +1594,11 @@ class WildIslesGame {
             );
         }
 
+        // Synchronize initial world time.
         this.updateWorldTime(0);
+
+        // Ensure initial UI is ready.
+        this.updatePlayerUI();
 
         this.animate();
 
@@ -1566,6 +1671,41 @@ class WildIslesGame {
 
 
         // ====================================================
+        // DAY / NIGHT
+        // ====================================================
+
+        if (
+            this.dayNight
+        ) {
+
+            this.dayNight.update(
+                deltaTime
+            );
+
+            // Read current time after update.
+            if (
+                Number.isFinite(
+                    this.dayNight.timeOfDay
+                )
+            ) {
+
+                this.worldTime =
+                    this.dayNight.timeOfDay;
+            }
+
+            if (
+                Number.isFinite(
+                    this.dayNight.day
+                )
+            ) {
+
+                this.day =
+                    this.dayNight.day;
+            }
+        }
+
+
+        // ====================================================
         // CAMERA
         // ====================================================
 
@@ -1579,7 +1719,7 @@ class WildIslesGame {
         // ====================================================
 
         this.updateWorldTime(
-            deltaTime
+            0
         );
 
 
@@ -1628,10 +1768,17 @@ class WildIslesGame {
         // RENDER
         // ====================================================
 
-        this.renderer.render(
-            this.scene,
+        if (
+            this.renderer &&
+            this.scene &&
             this.camera
-        );
+        ) {
+
+            this.renderer.render(
+                this.scene,
+                this.camera
+            );
+        }
     }
 
 
