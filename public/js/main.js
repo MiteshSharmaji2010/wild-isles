@@ -2,7 +2,7 @@
 // WILD ISLES
 // VEYRA ISLAND
 // MAIN GAME
-// STEP 7 - THIRD PERSON CAMERA
+// STEP 7 - CAMERA + PLAYER
 // ============================================================
 
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
@@ -16,10 +16,17 @@ import { Player } from "./player.js";
 // DOM
 // ============================================================
 
-const container = document.getElementById("game-container");
-const loadingScreen = document.getElementById("loading-screen");
-const loadingProgress = document.getElementById("loading-progress");
-const loadingText = document.getElementById("loading-text");
+const container =
+    document.getElementById("game-container");
+
+const loadingScreen =
+    document.getElementById("loading-screen");
+
+const loadingProgress =
+    document.getElementById("loading-progress");
+
+const loadingText =
+    document.getElementById("loading-text");
 
 // ============================================================
 // LOADING
@@ -28,11 +35,13 @@ const loadingText = document.getElementById("loading-text");
 function setLoading(progress, message) {
 
     if (loadingProgress) {
-        loadingProgress.style.width = progress + "%";
+        loadingProgress.style.width =
+            progress + "%";
     }
 
     if (loadingText) {
-        loadingText.textContent = message;
+        loadingText.textContent =
+            message;
     }
 }
 
@@ -40,10 +49,13 @@ function setLoading(progress, message) {
 // SCENE
 // ============================================================
 
-const scene = new THREE.Scene();
+const scene =
+    new THREE.Scene();
 
 scene.background =
-    new THREE.Color(0x87a9b5);
+    new THREE.Color(
+        0x87a9b5
+    );
 
 scene.fog =
     new THREE.Fog(
@@ -72,7 +84,8 @@ const camera =
 const renderer =
     new THREE.WebGLRenderer({
         antialias: true,
-        powerPreference: "high-performance"
+        powerPreference:
+            "high-performance"
     });
 
 renderer.setSize(
@@ -88,6 +101,7 @@ renderer.setPixelRatio(
 );
 
 renderer.shadowMap.enabled = true;
+
 renderer.shadowMap.type =
     THREE.PCFSoftShadowMap;
 
@@ -96,7 +110,7 @@ container.appendChild(
 );
 
 // ============================================================
-// LIGHT
+// LIGHTING
 // ============================================================
 
 const hemisphereLight =
@@ -124,18 +138,33 @@ sun.position.set(
 
 sun.castShadow = true;
 
-sun.shadow.mapSize.width = 2048;
-sun.shadow.mapSize.height = 2048;
+sun.shadow.mapSize.width =
+    2048;
 
-sun.shadow.camera.left = -350;
-sun.shadow.camera.right = 350;
-sun.shadow.camera.top = 350;
-sun.shadow.camera.bottom = -350;
+sun.shadow.mapSize.height =
+    2048;
 
-sun.shadow.camera.near = 1;
-sun.shadow.camera.far = 800;
+sun.shadow.camera.left =
+    -350;
 
-scene.add(sun);
+sun.shadow.camera.right =
+    350;
+
+sun.shadow.camera.top =
+    350;
+
+sun.shadow.camera.bottom =
+    -350;
+
+sun.shadow.camera.near =
+    1;
+
+sun.shadow.camera.far =
+    800;
+
+scene.add(
+    sun
+);
 
 // ============================================================
 // TERRAIN
@@ -181,6 +210,21 @@ const environment =
     );
 
 // ============================================================
+// CAMERA SYSTEM
+// ============================================================
+
+const cameraSystem = {
+
+    yaw: Math.PI,
+
+    pitch: 0.28,
+
+    distance: 8,
+
+    height: 3.8
+};
+
+// ============================================================
 // PLAYER
 // ============================================================
 
@@ -192,29 +236,21 @@ setLoading(
 const player =
     new Player(
         scene,
-        terrain
+        terrain,
+        cameraSystem
     );
 
 // ============================================================
-// CAMERA CONTROL
+// MOUSE CAMERA
 // ============================================================
-
-let cameraYaw = 0;
-let cameraPitch = 0.28;
-
-const cameraDistance = 8;
-const cameraHeight = 3.8;
 
 let mouseDown = false;
 
 let lastMouseX = 0;
 let lastMouseY = 0;
 
-const mouseSensitivity = 0.006;
-
-// ============================================================
-// MOUSE CONTROL
-// ============================================================
+const mouseSensitivity =
+    0.006;
 
 renderer.domElement.addEventListener(
     "mousedown",
@@ -227,6 +263,8 @@ renderer.domElement.addEventListener(
 
         lastMouseY =
             event.clientY;
+
+        renderer.domElement.requestPointerLock?.();
     }
 );
 
@@ -235,6 +273,14 @@ window.addEventListener(
     () => {
 
         mouseDown = false;
+
+        if (
+            document.pointerLockElement ===
+            renderer.domElement
+        ) {
+
+            document.exitPointerLock?.();
+        }
     }
 );
 
@@ -246,31 +292,48 @@ window.addEventListener(
             return;
         }
 
-        const deltaX =
-            event.clientX -
-            lastMouseX;
+        let deltaX;
+        let deltaY;
 
-        const deltaY =
-            event.clientY -
-            lastMouseY;
+        if (
+            document.pointerLockElement ===
+            renderer.domElement
+        ) {
 
-        lastMouseX =
-            event.clientX;
+            deltaX =
+                event.movementX || 0;
 
-        lastMouseY =
-            event.clientY;
+            deltaY =
+                event.movementY || 0;
 
-        cameraYaw -=
+        } else {
+
+            deltaX =
+                event.clientX -
+                lastMouseX;
+
+            deltaY =
+                event.clientY -
+                lastMouseY;
+
+            lastMouseX =
+                event.clientX;
+
+            lastMouseY =
+                event.clientY;
+        }
+
+        cameraSystem.yaw -=
             deltaX *
             mouseSensitivity;
 
-        cameraPitch -=
+        cameraSystem.pitch -=
             deltaY *
             mouseSensitivity;
 
-        cameraPitch =
+        cameraSystem.pitch =
             THREE.MathUtils.clamp(
-                cameraPitch,
+                cameraSystem.pitch,
                 -0.15,
                 1.15
             );
@@ -278,22 +341,21 @@ window.addEventListener(
 );
 
 // ============================================================
-// RIGHT CLICK DISABLE
+// RIGHT CLICK
 // ============================================================
 
 renderer.domElement.addEventListener(
     "contextmenu",
     (event) => {
-
         event.preventDefault();
     }
 );
 
 // ============================================================
-// CAMERA UPDATE
+// CAMERA
 // ============================================================
 
-const cameraPosition =
+const desiredCameraPosition =
     new THREE.Vector3();
 
 const cameraTarget =
@@ -304,49 +366,53 @@ function updateCamera(delta) {
     const playerPosition =
         player.getPosition();
 
-    // Camera direction
     const horizontalDistance =
-        Math.cos(cameraPitch) *
-        cameraDistance;
+        Math.cos(
+            cameraSystem.pitch
+        ) *
+        cameraSystem.distance;
 
     const verticalDistance =
-        Math.sin(cameraPitch) *
-        cameraDistance;
+        Math.sin(
+            cameraSystem.pitch
+        ) *
+        cameraSystem.distance;
 
     const offsetX =
-        Math.sin(cameraYaw) *
+        Math.sin(
+            cameraSystem.yaw
+        ) *
         horizontalDistance;
 
     const offsetZ =
-        Math.cos(cameraYaw) *
+        Math.cos(
+            cameraSystem.yaw
+        ) *
         horizontalDistance;
 
-    // Desired camera position
-    cameraPosition.set(
+    desiredCameraPosition.set(
         playerPosition.x +
             offsetX,
 
         playerPosition.y +
-            cameraHeight +
+            cameraSystem.height +
             verticalDistance,
 
         playerPosition.z +
             offsetZ
     );
 
-    // Smooth camera
     camera.position.lerp(
-        cameraPosition,
+        desiredCameraPosition,
         Math.min(
             1,
             delta * 8
         )
     );
 
-    // Look at player
     cameraTarget.set(
         playerPosition.x,
-        playerPosition.y + 1.25,
+        playerPosition.y + 1.2,
         playerPosition.z
     );
 
@@ -354,22 +420,6 @@ function updateCamera(delta) {
         cameraTarget
     );
 }
-
-// ============================================================
-// CAMERA START POSITION
-// ============================================================
-
-cameraYaw =
-    Math.PI;
-
-cameraPitch =
-    0.25;
-
-camera.position.set(
-    0,
-    6,
-    10
-);
 
 // ============================================================
 // RESIZE
@@ -425,29 +475,24 @@ function animate() {
     const elapsedTime =
         clock.elapsedTime;
 
-    // Player
     player.update(
         delta
     );
 
-    // Environment
     environment.update(
         delta,
         elapsedTime
     );
 
-    // Water
     water.update(
         delta,
         elapsedTime
     );
 
-    // Camera
     updateCamera(
         delta
     );
 
-    // Render
     renderer.render(
         scene,
         camera
@@ -455,7 +500,7 @@ function animate() {
 }
 
 // ============================================================
-// START GAME
+// START
 // ============================================================
 
 setLoading(
