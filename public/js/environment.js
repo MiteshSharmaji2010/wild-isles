@@ -1,8 +1,17 @@
 // ============================================================
 // WILD ISLES
 // VEYRA ISLAND
-// ENVIRONMENT SYSTEM v0.5
-// REALISTIC VEGETATION + ROCKS + BUSHES
+// ENVIRONMENT SYSTEM v0.6
+//
+// Forest
+// Trees
+// Bushes
+// Rocks
+// Grass
+// Biome-aware placement
+// Water-safe placement
+// Mountain-aware placement
+// Performance optimized
 // ============================================================
 
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
@@ -14,244 +23,148 @@ export class VeyraEnvironment {
         this.scene = scene;
         this.terrain = terrain;
 
-        // ----------------------------------------------------
-        // GROUPS
-        // ----------------------------------------------------
+        // ====================================================
+        // WORLD SETTINGS
+        // ====================================================
 
-        this.worldGroup =
-            new THREE.Group();
+        this.worldSize = 820;
 
-        this.treeGroup =
-            new THREE.Group();
+        this.waterLevel = 1.8;
 
-        this.bushGroup =
-            new THREE.Group();
+        this.beachLevel = 5.5;
 
-        this.rockGroup =
-            new THREE.Group();
+        this.minTreeHeight = 5.5;
 
-        this.grassGroup =
-            new THREE.Group();
+        this.maxTreeSlope = 28;
 
-        this.worldGroup.add(
-            this.treeGroup
-        );
+        this.maxBushSlope = 34;
 
-        this.worldGroup.add(
-            this.bushGroup
-        );
+        this.maxRockSlope = 52;
 
-        this.worldGroup.add(
-            this.rockGroup
-        );
+        // ====================================================
+        // OBJECT COUNTS
+        // ====================================================
 
-        this.worldGroup.add(
-            this.grassGroup
-        );
+        this.treeCount = 360;
+        this.bushCount = 280;
+        this.rockCount = 180;
+        this.grassCount = 700;
 
-        this.scene.add(
-            this.worldGroup
-        );
-
-        // ----------------------------------------------------
+        // ====================================================
         // ARRAYS
-        // ----------------------------------------------------
+        // ====================================================
 
         this.trees = [];
         this.bushes = [];
         this.rocks = [];
         this.grass = [];
 
-        // ----------------------------------------------------
-        // SHARED MATERIALS
-        // ----------------------------------------------------
-
-        this.createMaterials();
-
-        // ----------------------------------------------------
+        // ====================================================
         // SHARED GEOMETRIES
-        // ----------------------------------------------------
+        // ====================================================
 
-        this.createGeometries();
+        this.treeTrunkGeometry =
+            new THREE.CylinderGeometry(
+                0.18,
+                0.28,
+                3.2,
+                7
+            );
 
-        // ----------------------------------------------------
-        // WORLD
-        // ----------------------------------------------------
+        this.treeCrownGeometry =
+            new THREE.SphereGeometry(
+                1.35,
+                8,
+                6
+            );
 
-        this.createForest();
+        this.smallTreeCrownGeometry =
+            new THREE.SphereGeometry(
+                0.9,
+                7,
+                5
+            );
+
+        this.bushGeometry =
+            new THREE.SphereGeometry(
+                0.65,
+                7,
+                5
+            );
+
+        this.rockGeometry =
+            new THREE.DodecahedronGeometry(
+                1,
+                0
+            );
+
+        this.grassGeometry =
+            new THREE.PlaneGeometry(
+                0.45,
+                1.0
+            );
+
+        // ====================================================
+        // MATERIALS
+        // ====================================================
+
+        this.treeTrunkMaterial =
+            new THREE.MeshStandardMaterial({
+                color: 0x4a3322,
+                roughness: 1.0,
+                metalness: 0
+            });
+
+        this.treeCrownMaterial =
+            new THREE.MeshStandardMaterial({
+                color: 0x29472d,
+                roughness: 1.0,
+                metalness: 0
+            });
+
+        this.smallTreeCrownMaterial =
+            new THREE.MeshStandardMaterial({
+                color: 0x355a35,
+                roughness: 1.0,
+                metalness: 0
+            });
+
+        this.bushMaterial =
+            new THREE.MeshStandardMaterial({
+                color: 0x315234,
+                roughness: 1.0,
+                metalness: 0
+            });
+
+        this.rockMaterial =
+            new THREE.MeshStandardMaterial({
+                color: 0x62645e,
+                roughness: 0.96,
+                metalness: 0.02
+            });
+
+        this.grassMaterial =
+            new THREE.MeshStandardMaterial({
+                color: 0x41633c,
+                roughness: 1,
+                metalness: 0,
+                side: THREE.DoubleSide,
+                transparent: true,
+                alphaTest: 0.15
+            });
+
+        // ====================================================
+        // CREATE ENVIRONMENT
+        // ====================================================
+
+        this.createTrees();
         this.createBushes();
         this.createRocks();
         this.createGrass();
 
         console.log(
-            "Veyra Environment v0.5 READY"
+            "Veyra Environment v0.6 READY"
         );
-    }
-
-    // ========================================================
-    // MATERIALS
-    // ========================================================
-
-    createMaterials() {
-
-        this.trunkMaterial =
-            new THREE.MeshStandardMaterial({
-                color: 0x493525,
-                roughness: 0.98,
-                metalness: 0
-            });
-
-        this.branchMaterial =
-            new THREE.MeshStandardMaterial({
-                color: 0x3c2b20,
-                roughness: 1
-            });
-
-        this.leafMaterials = [
-
-            new THREE.MeshStandardMaterial({
-                color: 0x24452a,
-                roughness: 0.96
-            }),
-
-            new THREE.MeshStandardMaterial({
-                color: 0x315934,
-                roughness: 0.96
-            }),
-
-            new THREE.MeshStandardMaterial({
-                color: 0x3b6538,
-                roughness: 0.96
-            }),
-
-            new THREE.MeshStandardMaterial({
-                color: 0x294d30,
-                roughness: 0.96
-            })
-        ];
-
-        this.bushMaterials = [
-
-            new THREE.MeshStandardMaterial({
-                color: 0x315532,
-                roughness: 1
-            }),
-
-            new THREE.MeshStandardMaterial({
-                color: 0x42683a,
-                roughness: 1
-            }),
-
-            new THREE.MeshStandardMaterial({
-                color: 0x52753d,
-                roughness: 1
-            })
-        ];
-
-        this.grassMaterials = [
-
-            new THREE.MeshStandardMaterial({
-                color: 0x4e713d,
-                roughness: 1,
-                side: THREE.DoubleSide
-            }),
-
-            new THREE.MeshStandardMaterial({
-                color: 0x648548,
-                roughness: 1,
-                side: THREE.DoubleSide
-            }),
-
-            new THREE.MeshStandardMaterial({
-                color: 0x3d6337,
-                roughness: 1,
-                side: THREE.DoubleSide
-            })
-        ];
-
-        this.rockMaterials = [
-
-            new THREE.MeshStandardMaterial({
-                color: 0x555954,
-                roughness: 1
-            }),
-
-            new THREE.MeshStandardMaterial({
-                color: 0x666762,
-                roughness: 0.98
-            }),
-
-            new THREE.MeshStandardMaterial({
-                color: 0x484c48,
-                roughness: 1
-            })
-        ];
-    }
-
-    // ========================================================
-    // GEOMETRIES
-    // ========================================================
-
-    createGeometries() {
-
-        this.trunkGeometry =
-            new THREE.CylinderGeometry(
-                0.38,
-                0.62,
-                4.8,
-                8
-            );
-
-        this.branchGeometry =
-            new THREE.CylinderGeometry(
-                0.12,
-                0.20,
-                2.2,
-                6
-            );
-
-        this.leafGeometry =
-            new THREE.IcosahedronGeometry(
-                2.3,
-                1
-            );
-
-        this.leafSmallGeometry =
-            new THREE.IcosahedronGeometry(
-                1.65,
-                1
-            );
-
-        this.bushGeometry =
-            new THREE.IcosahedronGeometry(
-                1.25,
-                1
-            );
-
-        this.grassGeometry =
-            new THREE.ConeGeometry(
-                0.55,
-                2.0,
-                5
-            );
-
-        this.rockGeometries = [
-
-            new THREE.DodecahedronGeometry(
-                1.5,
-                1
-            ),
-
-            new THREE.IcosahedronGeometry(
-                1.5,
-                1
-            ),
-
-            new THREE.DodecahedronGeometry(
-                1.2,
-                1
-            )
-        ];
     }
 
     // ========================================================
@@ -260,23 +173,313 @@ export class VeyraEnvironment {
 
     random(min, max) {
 
-        return min +
+        return (
+            min +
             Math.random() *
-            (max - min);
+            (max - min)
+        );
     }
 
     // ========================================================
-    // TREE
+    // RANDOM WORLD POSITION
+    // ========================================================
+
+    randomPosition() {
+
+        const radius =
+            Math.sqrt(
+                Math.random()
+            ) *
+            395;
+
+        const angle =
+            Math.random() *
+            Math.PI *
+            2;
+
+        return {
+            x:
+                Math.cos(angle) *
+                radius,
+
+            z:
+                Math.sin(angle) *
+                radius
+        };
+    }
+
+    // ========================================================
+    // TERRAIN DATA
+    // ========================================================
+
+    getTerrainData(x, z) {
+
+        const height =
+            this.terrain.getGroundHeight(
+                x,
+                z
+            );
+
+        const slope =
+            this.terrain.getSlopeDegrees(
+                x,
+                z
+            );
+
+        const distance =
+            Math.sqrt(
+                x * x +
+                z * z
+            );
+
+        let biome =
+            "forest";
+
+        if (
+            distance > 335 &&
+            height < 6
+        ) {
+
+            biome = "beach";
+
+        }
+        else if (
+            height > 82
+        ) {
+
+            biome = "mountain";
+
+        }
+        else if (
+            height > 48
+        ) {
+
+            biome = "highland";
+
+        }
+        else if (
+            slope > 30
+        ) {
+
+            biome = "rock";
+
+        }
+        else if (
+            height < 8
+        ) {
+
+            biome = "grassland";
+        }
+
+        return {
+            height,
+            slope,
+            distance,
+            biome
+        };
+    }
+
+    // ========================================================
+    // WATER CHECK
+    // ========================================================
+
+    isUnderwater(
+        x,
+        z
+    ) {
+
+        const ground =
+            this.terrain.getGroundHeight(
+                x,
+                z
+            );
+
+        return (
+            ground <
+            this.waterLevel
+        );
+    }
+
+    // ========================================================
+    // WATER BUFFER CHECK
+    // ========================================================
+
+    isTooCloseToWater(
+        x,
+        z,
+        buffer = 2
+    ) {
+
+        const centerHeight =
+            this.terrain.getGroundHeight(
+                x,
+                z
+            );
+
+        if (
+            centerHeight <
+            this.waterLevel +
+            buffer
+        ) {
+
+            return true;
+        }
+
+        // Sample around position
+        const samples = 8;
+
+        for (
+            let i = 0;
+            i < samples;
+            i++
+        ) {
+
+            const angle =
+                (i / samples) *
+                Math.PI *
+                2;
+
+            const sx =
+                x +
+                Math.cos(angle) *
+                buffer;
+
+            const sz =
+                z +
+                Math.sin(angle) *
+                buffer;
+
+            const height =
+                this.terrain.getGroundHeight(
+                    sx,
+                    sz
+                );
+
+            if (
+                height <
+                this.waterLevel
+            ) {
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // ========================================================
+    // VALID TREE POSITION
+    // ========================================================
+
+    isValidTreePosition(
+        x,
+        z
+    ) {
+
+        const data =
+            this.getTerrainData(
+                x,
+                z
+            );
+
+        // Never underwater
+        if (
+            data.height <=
+            this.waterLevel + 0.5
+        ) {
+
+            return false;
+        }
+
+        // Water buffer
+        if (
+            this.isTooCloseToWater(
+                x,
+                z,
+                2.5
+            )
+        ) {
+
+            return false;
+        }
+
+        // Beach should stay mostly open
+        if (
+            data.biome === "beach"
+        ) {
+
+            return false;
+        }
+
+        // Mountains should not have normal forest trees
+        if (
+            data.biome === "mountain"
+        ) {
+
+            return false;
+        }
+
+        // Very steep terrain
+        if (
+            data.slope >
+            this.maxTreeSlope
+        ) {
+
+            return false;
+        }
+
+        // Trees prefer forest/highland/grassland
+        if (
+            data.biome !== "forest" &&
+            data.biome !== "highland" &&
+            data.biome !== "grassland"
+        ) {
+
+            return false;
+        }
+
+        return true;
+    }
+
+    // ========================================================
+    // CREATE TREE
     // ========================================================
 
     createTree(
         x,
-        z,
-        scale = 1
+        z
     ) {
 
-        const group =
+        const data =
+            this.getTerrainData(
+                x,
+                z
+            );
+
+        const tree =
             new THREE.Group();
+
+        tree.name =
+            "VeyraTree";
+
+        // ----------------------------------------------------
+        // HEIGHT
+        // ----------------------------------------------------
+
+        let trunkHeight =
+            this.random(
+                2.8,
+                4.4
+            );
+
+        if (
+            data.biome ===
+            "highland"
+        ) {
+
+            trunkHeight *=
+                0.85;
+        }
 
         // ----------------------------------------------------
         // TRUNK
@@ -284,499 +487,427 @@ export class VeyraEnvironment {
 
         const trunk =
             new THREE.Mesh(
-                this.trunkGeometry,
-                this.trunkMaterial
+                this.treeTrunkGeometry,
+                this.treeTrunkMaterial
             );
+
+        trunk.scale.y =
+            trunkHeight / 3.2;
 
         trunk.position.y =
-            2.4;
-
-        trunk.scale.set(
-            1,
-            this.random(
-                0.9,
-                1.25
-            ),
-            1
-        );
-
-        trunk.rotation.z =
-            this.random(
-                -0.035,
-                0.035
-            );
+            trunkHeight * 0.5;
 
         trunk.castShadow = true;
-        trunk.receiveShadow = true;
 
-        group.add(
+        tree.add(
             trunk
         );
 
         // ----------------------------------------------------
-        // MAIN FOLIAGE
+        // MAIN CROWN
         // ----------------------------------------------------
 
-        const leafMaterial =
-            this.leafMaterials[
-                Math.floor(
-                    Math.random() *
-                    this.leafMaterials.length
-                )
-            ];
-
-        const lower =
+        const crown =
             new THREE.Mesh(
-                this.leafGeometry,
-                leafMaterial
+                this.treeCrownGeometry,
+                this.treeCrownMaterial
             );
 
-        lower.position.y =
-            5.0;
+        crown.position.y =
+            trunkHeight + 0.9;
 
-        lower.scale.set(
-            this.random(0.9, 1.25),
-            this.random(0.9, 1.2),
-            this.random(0.9, 1.25)
+        crown.scale.set(
+            this.random(
+                0.85,
+                1.15
+            ),
+            this.random(
+                0.9,
+                1.25
+            ),
+            this.random(
+                0.85,
+                1.15
+            )
         );
 
-        lower.rotation.y =
-            Math.random() *
-            Math.PI;
+        crown.castShadow = true;
 
-        lower.castShadow = true;
-        lower.receiveShadow = true;
-
-        group.add(
-            lower
+        tree.add(
+            crown
         );
 
         // ----------------------------------------------------
-        // UPPER FOLIAGE
+        // SECOND CROWN
         // ----------------------------------------------------
 
-        const upper =
+        const crown2 =
             new THREE.Mesh(
-                this.leafSmallGeometry,
-                leafMaterial
+                this.smallTreeCrownGeometry,
+                this.smallTreeCrownMaterial
             );
 
-        upper.position.y =
-            7.0;
-
-        upper.scale.set(
-            this.random(0.85, 1.15),
-            this.random(0.9, 1.25),
-            this.random(0.85, 1.15)
+        crown2.position.set(
+            this.random(
+                -0.35,
+                0.35
+            ),
+            trunkHeight + 1.8,
+            this.random(
+                -0.35,
+                0.35
+            )
         );
 
-        upper.rotation.y =
-            Math.random() *
-            Math.PI;
-
-        upper.castShadow = true;
-
-        group.add(
-            upper
+        crown2.scale.set(
+            1,
+            0.8,
+            1
         );
 
-        // ----------------------------------------------------
-        // SMALL SIDE BRANCH
-        // ----------------------------------------------------
+        crown2.castShadow = true;
 
-        if (Math.random() > 0.45) {
-
-            const branch =
-                new THREE.Mesh(
-                    this.branchGeometry,
-                    this.branchMaterial
-                );
-
-            branch.position.set(
-                this.random(
-                    -0.55,
-                    0.55
-                ),
-                4.0,
-                this.random(
-                    -0.35,
-                    0.35
-                )
-            );
-
-            branch.rotation.z =
-                this.random(
-                    -0.8,
-                    0.8
-                );
-
-            branch.rotation.x =
-                this.random(
-                    -0.5,
-                    0.5
-                );
-
-            branch.castShadow =
-                true;
-
-            group.add(
-                branch
-            );
-        }
+        tree.add(
+            crown2
+        );
 
         // ----------------------------------------------------
         // POSITION
         // ----------------------------------------------------
 
-        const height =
-            this.terrain.getGroundHeight(
-                x,
-                z
-            );
+        const ground =
+            data.height;
 
-        group.position.set(
+        tree.position.set(
             x,
-            height,
+            ground,
             z
         );
 
-        group.scale.setScalar(
-            scale
-        );
+        // ----------------------------------------------------
+        // ROTATION
+        // ----------------------------------------------------
 
-        group.rotation.y =
+        tree.rotation.y =
             Math.random() *
             Math.PI *
             2;
 
-        this.treeGroup.add(
-            group
+        // ----------------------------------------------------
+        // SCALE VARIATION
+        // ----------------------------------------------------
+
+        const scale =
+            this.random(
+                0.75,
+                1.35
+            );
+
+        tree.scale.setScalar(
+            scale
+        );
+
+        this.scene.add(
+            tree
         );
 
         this.trees.push(
-            group
+            tree
         );
     }
 
     // ========================================================
-    // FOREST
+    // CREATE TREES
     // ========================================================
 
-    createForest() {
+    createTrees() {
 
-        const count = 360;
+        let created = 0;
 
-        for (
-            let i = 0;
-            i < count;
-            i++
+        let attempts = 0;
+
+        const maxAttempts =
+            this.treeCount * 12;
+
+        while (
+            created <
+            this.treeCount &&
+            attempts <
+            maxAttempts
         ) {
 
-            const angle =
-                Math.random() *
-                Math.PI *
-                2;
+            attempts++;
 
-            const radius =
-                this.random(
-                    55,
-                    295
-                );
+            const pos =
+                this.randomPosition();
 
-            const x =
-                Math.cos(angle) *
-                radius;
+            if (
+                !this.isValidTreePosition(
+                    pos.x,
+                    pos.z
+                )
+            ) {
 
-            const z =
-                Math.sin(angle) *
-                radius;
+                continue;
+            }
 
-            const distance =
+            // Keep trees away from exact island center
+            // to leave room for player/spawn/structures.
+            const centerDistance =
                 Math.sqrt(
-                    x * x +
-                    z * z
+                    pos.x * pos.x +
+                    pos.z * pos.z
                 );
 
             if (
-                distance < 48 ||
-                distance > 302
+                centerDistance < 18
             ) {
+
                 continue;
             }
-
-            const height =
-                this.terrain.getGroundHeight(
-                    x,
-                    z
-                );
-
-            // Don't cover high mountains
-            if (height > 68) {
-                continue;
-            }
-
-            // Don't place trees on steep slopes
-            const slope =
-                this.terrain.getSlopeAngle(
-                    x,
-                    z
-                );
-
-            if (
-                slope >
-                THREE.MathUtils.degToRad(35)
-            ) {
-                continue;
-            }
-
-            // Coast vegetation reduction
-            if (
-                distance > 275 &&
-                Math.random() < 0.7
-            ) {
-                continue;
-            }
-
-            const scale =
-                this.random(
-                    0.72,
-                    1.45
-                );
 
             this.createTree(
-                x,
-                z,
-                scale
+                pos.x,
+                pos.z
             );
+
+            created++;
         }
+
+        console.log(
+            `Trees created: ${created}`
+        );
     }
 
     // ========================================================
-    // BUSH
+    // VALID BUSH POSITION
+    // ========================================================
+
+    isValidBushPosition(
+        x,
+        z
+    ) {
+
+        const data =
+            this.getTerrainData(
+                x,
+                z
+            );
+
+        // Underwater
+        if (
+            data.height <=
+            this.waterLevel + 0.35
+        ) {
+
+            return false;
+        }
+
+        // Close to water
+        if (
+            this.isTooCloseToWater(
+                x,
+                z,
+                1.3
+            )
+        ) {
+
+            return false;
+        }
+
+        // Very steep
+        if (
+            data.slope >
+            this.maxBushSlope
+        ) {
+
+            return false;
+        }
+
+        // No bushes on high mountain peaks
+        if (
+            data.height > 78
+        ) {
+
+            return false;
+        }
+
+        // Beach only occasional bushes
+        if (
+            data.biome === "beach"
+        ) {
+
+            return Math.random() <
+                0.10;
+        }
+
+        return true;
+    }
+
+    // ========================================================
+    // CREATE BUSH
     // ========================================================
 
     createBush(
         x,
-        z,
-        scale = 1
+        z
     ) {
 
-        const group =
-            new THREE.Group();
-
-        const material =
-            this.bushMaterials[
-                Math.floor(
-                    Math.random() *
-                    this.bushMaterials.length
-                )
-            ];
+        const height =
+            this.terrain.getGroundHeight(
+                x,
+                z
+            );
 
         const bush =
             new THREE.Mesh(
                 this.bushGeometry,
-                material
+                this.bushMaterial
             );
 
-        bush.position.y =
-            0.75;
+        const scale =
+            this.random(
+                0.55,
+                1.25
+            );
 
         bush.scale.set(
-            this.random(1.0, 1.5),
-            this.random(0.65, 1.0),
-            this.random(0.9, 1.4)
-        );
-
-        bush.castShadow = true;
-        bush.receiveShadow = true;
-
-        group.add(
-            bush
-        );
-
-        // Small second part
-        if (Math.random() > 0.35) {
-
-            const small =
-                new THREE.Mesh(
-                    this.bushGeometry,
-                    material
-                );
-
-            small.position.set(
-                this.random(
-                    -0.7,
-                    0.7
-                ),
-                0.55,
-                this.random(
-                    -0.6,
-                    0.6
-                )
-            );
-
-            small.scale.setScalar(
-                this.random(
-                    0.45,
-                    0.75
-                )
-            );
-
-            small.castShadow =
-                true;
-
-            group.add(
-                small
-            );
-        }
-
-        const height =
-            this.terrain.getGroundHeight(
-                x,
-                z
-            );
-
-        group.position.set(
-            x,
-            height,
-            z
-        );
-
-        group.scale.setScalar(
+            scale,
+            this.random(
+                0.65,
+                1.0
+            ),
             scale
         );
 
-        group.rotation.y =
+        bush.position.set(
+            x,
+            height +
+            scale * 0.35,
+            z
+        );
+
+        bush.rotation.y =
             Math.random() *
             Math.PI *
             2;
 
-        this.bushGroup.add(
-            group
+        bush.castShadow = true;
+
+        bush.receiveShadow = true;
+
+        this.scene.add(
+            bush
         );
 
         this.bushes.push(
-            group
+            bush
         );
     }
 
     // ========================================================
-    // BUSHES
+    // CREATE BUSHES
     // ========================================================
 
     createBushes() {
 
-        const count = 300;
+        let created = 0;
 
-        for (
-            let i = 0;
-            i < count;
-            i++
+        let attempts = 0;
+
+        const maxAttempts =
+            this.bushCount * 10;
+
+        while (
+            created <
+            this.bushCount &&
+            attempts <
+            maxAttempts
         ) {
 
-            const angle =
-                Math.random() *
-                Math.PI *
-                2;
+            attempts++;
 
-            const radius =
-                this.random(
-                    45,
-                    300
-                );
-
-            const x =
-                Math.cos(angle) *
-                radius;
-
-            const z =
-                Math.sin(angle) *
-                radius;
-
-            const distance =
-                Math.sqrt(
-                    x * x +
-                    z * z
-                );
+            const pos =
+                this.randomPosition();
 
             if (
-                distance < 40 ||
-                distance > 305
+                !this.isValidBushPosition(
+                    pos.x,
+                    pos.z
+                )
             ) {
-                continue;
-            }
 
-            const height =
-                this.terrain.getGroundHeight(
-                    x,
-                    z
-                );
-
-            if (
-                height > 70 ||
-                height < 1
-            ) {
-                continue;
-            }
-
-            const slope =
-                this.terrain.getSlopeAngle(
-                    x,
-                    z
-                );
-
-            if (
-                slope >
-                THREE.MathUtils.degToRad(38)
-            ) {
                 continue;
             }
 
             this.createBush(
-                x,
-                z,
-                this.random(
-                    0.55,
-                    1.15
-                )
+                pos.x,
+                pos.z
             );
+
+            created++;
         }
+
+        console.log(
+            `Bushes created: ${created}`
+        );
     }
 
     // ========================================================
-    // ROCK
+    // VALID ROCK POSITION
+    // ========================================================
+
+    isValidRockPosition(
+        x,
+        z
+    ) {
+
+        const data =
+            this.getTerrainData(
+                x,
+                z
+            );
+
+        // Never underwater
+        if (
+            data.height <
+            this.waterLevel + 0.15
+        ) {
+
+            return false;
+        }
+
+        // No rocks inside water
+        if (
+            this.isUnderwater(
+                x,
+                z
+            )
+        ) {
+
+            return false;
+        }
+
+        // Rocks can exist on steep areas
+        if (
+            data.slope >
+            this.maxRockSlope
+        ) {
+
+            return false;
+        }
+
+        return true;
+    }
+
+    // ========================================================
+    // CREATE ROCK
     // ========================================================
 
     createRock(
         x,
-        z,
-        scale = 1
+        z
     ) {
-
-        const index =
-            Math.floor(
-                Math.random() *
-                this.rockGeometries.length
-            );
-
-        const geometry =
-            this.rockGeometries[
-                index
-            ];
-
-        const material =
-            this.rockMaterials[
-                Math.floor(
-                    Math.random() *
-                    this.rockMaterials.length
-                )
-            ];
-
-        const rock =
-            new THREE.Mesh(
-                geometry,
-                material
-            );
 
         const height =
             this.terrain.getGroundHeight(
@@ -784,53 +915,62 @@ export class VeyraEnvironment {
                 z
             );
 
+        const rock =
+            new THREE.Mesh(
+                this.rockGeometry,
+                this.rockMaterial
+            );
+
+        const scaleX =
+            this.random(
+                0.45,
+                1.8
+            );
+
+        const scaleY =
+            this.random(
+                0.35,
+                1.15
+            );
+
+        const scaleZ =
+            this.random(
+                0.45,
+                1.6
+            );
+
+        rock.scale.set(
+            scaleX,
+            scaleY,
+            scaleZ
+        );
+
         rock.position.set(
             x,
             height +
-                0.5 *
-                scale,
+            scaleY * 0.35,
             z
-        );
-
-        rock.scale.set(
-            scale *
-                this.random(
-                    1.0,
-                    1.5
-                ),
-
-            scale *
-                this.random(
-                    0.65,
-                    1.1
-                ),
-
-            scale *
-                this.random(
-                    0.9,
-                    1.35
-                )
         );
 
         rock.rotation.set(
             this.random(
-                -0.2,
-                0.2
+                -0.25,
+                0.25
             ),
-
             Math.random() *
-            Math.PI,
-
+            Math.PI *
+            2,
             this.random(
-                -0.2,
-                0.2
+                -0.25,
+                0.25
             )
         );
 
         rock.castShadow = true;
+
         rock.receiveShadow = true;
 
-        this.rockGroup.add(
+        this.scene.add(
             rock
         );
 
@@ -840,96 +980,106 @@ export class VeyraEnvironment {
     }
 
     // ========================================================
-    // ROCKS
+    // CREATE ROCKS
     // ========================================================
 
     createRocks() {
 
-        const count = 170;
+        let created = 0;
 
-        for (
-            let i = 0;
-            i < count;
-            i++
+        let attempts = 0;
+
+        const maxAttempts =
+            this.rockCount * 10;
+
+        while (
+            created <
+            this.rockCount &&
+            attempts <
+            maxAttempts
         ) {
 
-            const angle =
-                Math.random() *
-                Math.PI *
-                2;
+            attempts++;
 
-            const radius =
-                this.random(
-                    60,
-                    320
-                );
-
-            const x =
-                Math.cos(angle) *
-                radius;
-
-            const z =
-                Math.sin(angle) *
-                radius;
-
-            const distance =
-                Math.sqrt(
-                    x * x +
-                    z * z
-                );
+            const pos =
+                this.randomPosition();
 
             if (
-                distance > 325
+                !this.isValidRockPosition(
+                    pos.x,
+                    pos.z
+                )
             ) {
-                continue;
-            }
 
-            const height =
-                this.terrain.getGroundHeight(
-                    x,
-                    z
-                );
-
-            if (
-                height > 105
-            ) {
                 continue;
             }
 
             this.createRock(
-                x,
-                z,
-                this.random(
-                    0.35,
-                    1.8
-                )
+                pos.x,
+                pos.z
             );
+
+            created++;
         }
+
+        console.log(
+            `Rocks created: ${created}`
+        );
     }
 
     // ========================================================
-    // GRASS
+    // VALID GRASS POSITION
+    // ========================================================
+
+    isValidGrassPosition(
+        x,
+        z
+    ) {
+
+        const data =
+            this.getTerrainData(
+                x,
+                z
+            );
+
+        // Never underwater
+        if (
+            data.height <
+            this.waterLevel + 0.25
+        ) {
+
+            return false;
+        }
+
+        // No grass on steep rocks
+        if (
+            data.slope >
+            38
+        ) {
+
+            return false;
+        }
+
+        // No grass on high mountain peaks
+        if (
+            data.height >
+            88
+        ) {
+
+            return false;
+        }
+
+        return true;
+    }
+
+    // ========================================================
+    // CREATE GRASS
     // ========================================================
 
     createGrassBlade(
         x,
-        z,
-        scale = 1
+        z
     ) {
-
-        const material =
-            this.grassMaterials[
-                Math.floor(
-                    Math.random() *
-                    this.grassMaterials.length
-                )
-            ];
-
-        const grass =
-            new THREE.Mesh(
-                this.grassGeometry,
-                material
-            );
 
         const height =
             this.terrain.getGroundHeight(
@@ -937,42 +1087,41 @@ export class VeyraEnvironment {
                 z
             );
 
+        const grass =
+            new THREE.Mesh(
+                this.grassGeometry,
+                this.grassMaterial
+            );
+
+        const scale =
+            this.random(
+                0.55,
+                1.25
+            );
+
+        grass.scale.set(
+            scale,
+            scale,
+            scale
+        );
+
         grass.position.set(
             x,
             height +
-                0.75 *
-                scale,
+            0.45 * scale,
             z
-        );
-
-        grass.scale.set(
-            scale *
-                this.random(
-                    0.65,
-                    1.2
-                ),
-
-            scale *
-                this.random(
-                    0.7,
-                    1.3
-                ),
-
-            scale *
-                this.random(
-                    0.65,
-                    1.2
-                )
         );
 
         grass.rotation.y =
             Math.random() *
-            Math.PI;
+            Math.PI *
+            2;
 
         grass.castShadow = false;
-        grass.receiveShadow = true;
 
-        this.grassGroup.add(
+        grass.receiveShadow = false;
+
+        this.scene.add(
             grass
         );
 
@@ -982,150 +1131,222 @@ export class VeyraEnvironment {
     }
 
     // ========================================================
-    // GRASS
+    // CREATE GRASS
     // ========================================================
 
     createGrass() {
 
-        const count = 850;
+        let created = 0;
 
-        for (
-            let i = 0;
-            i < count;
-            i++
+        let attempts = 0;
+
+        const maxAttempts =
+            this.grassCount * 8;
+
+        while (
+            created <
+            this.grassCount &&
+            attempts <
+            maxAttempts
         ) {
 
-            const angle =
-                Math.random() *
-                Math.PI *
-                2;
+            attempts++;
 
-            const radius =
-                this.random(
-                    35,
-                    295
-                );
-
-            const x =
-                Math.cos(angle) *
-                radius;
-
-            const z =
-                Math.sin(angle) *
-                radius;
-
-            const distance =
-                Math.sqrt(
-                    x * x +
-                    z * z
-                );
+            const pos =
+                this.randomPosition();
 
             if (
-                distance > 300
+                !this.isValidGrassPosition(
+                    pos.x,
+                    pos.z
+                )
             ) {
-                continue;
-            }
 
-            const height =
-                this.terrain.getGroundHeight(
-                    x,
-                    z
-                );
-
-            if (
-                height < 2 ||
-                height > 75
-            ) {
-                continue;
-            }
-
-            const slope =
-                this.terrain.getSlopeAngle(
-                    x,
-                    z
-                );
-
-            if (
-                slope >
-                THREE.MathUtils.degToRad(42)
-            ) {
                 continue;
             }
 
             this.createGrassBlade(
-                x,
-                z,
-                this.random(
-                    0.3,
-                    0.8
-                )
+                pos.x,
+                pos.z
             );
+
+            created++;
         }
+
+        console.log(
+            `Grass created: ${created}`
+        );
     }
 
     // ========================================================
-    // WIND
+    // UPDATE
     // ========================================================
 
     update(
-        delta,
+        deltaTime,
         elapsedTime
     ) {
 
+        // Very lightweight vegetation movement.
+        // Avoid expensive per-frame transformations.
+
         if (
-            !this.grass ||
-            this.grass.length === 0
+            !this.trees.length
         ) {
+
             return;
         }
 
-        // Very light wind animation
-        // Only rotates objects slightly,
-        // keeping performance reasonable.
-
         const wind =
             Math.sin(
-                elapsedTime * 1.2
-            ) * 0.025;
+                elapsedTime *
+                0.8
+            ) *
+            0.008;
+
+        // Only animate a small number of trees
+        // to keep mobile performance good.
+
+        const animatedCount =
+            Math.min(
+                this.trees.length,
+                80
+            );
 
         for (
             let i = 0;
-            i < this.grass.length;
-            i++
-        ) {
-
-            const grass =
-                this.grass[i];
-
-            grass.rotation.z =
-                wind *
-                Math.sin(
-                    i * 0.7
-                );
-        }
-
-        // Trees move very slightly.
-        // No heavy animation.
-
-        const treeWind =
-            Math.sin(
-                elapsedTime * 0.35
-            ) * 0.008;
-
-        for (
-            let i = 0;
-            i < this.trees.length;
+            i < animatedCount;
             i++
         ) {
 
             const tree =
                 this.trees[i];
 
+            const original =
+                tree.userData.baseRotation;
+
+            if (
+                original === undefined
+            ) {
+
+                tree.userData.baseRotation =
+                    tree.rotation.z;
+            }
+
             tree.rotation.z =
-                treeWind *
-                Math.sin(
-                    i * 0.35
-                );
+                tree.userData.baseRotation +
+                wind;
         }
+    }
+
+    // ========================================================
+    // GET COUNTS
+    // ========================================================
+
+    getCounts() {
+
+        return {
+
+            trees:
+                this.trees.length,
+
+            bushes:
+                this.bushes.length,
+
+            rocks:
+                this.rocks.length,
+
+            grass:
+                this.grass.length
+        };
+    }
+
+    // ========================================================
+    // REMOVE ALL
+    // ========================================================
+
+    clear() {
+
+        // ----------------------------------------------------
+        // TREES
+        // ----------------------------------------------------
+
+        for (
+            const tree of this.trees
+        ) {
+
+            this.scene.remove(
+                tree
+            );
+        }
+
+        // ----------------------------------------------------
+        // BUSHES
+        // ----------------------------------------------------
+
+        for (
+            const bush of this.bushes
+        ) {
+
+            this.scene.remove(
+                bush
+            );
+        }
+
+        // ----------------------------------------------------
+        // ROCKS
+        // ----------------------------------------------------
+
+        for (
+            const rock of this.rocks
+        ) {
+
+            this.scene.remove(
+                rock
+            );
+        }
+
+        // ----------------------------------------------------
+        // GRASS
+        // ----------------------------------------------------
+
+        for (
+            const grass of this.grass
+        ) {
+
+            this.scene.remove(
+                grass
+            );
+        }
+
+        this.trees.length = 0;
+        this.bushes.length = 0;
+        this.rocks.length = 0;
+        this.grass.length = 0;
+    }
+
+    // ========================================================
+    // DISPOSE
+    // ========================================================
+
+    dispose() {
+
+        this.clear();
+
+        // Shared geometries
+        this.treeTrunkGeometry.dispose();
+        this.treeCrownGeometry.dispose();
+        this.smallTreeCrownGeometry.dispose();
+        this.bushGeometry.dispose();
+        this.rockGeometry.dispose();
+        this.grassGeometry.dispose();
+
+        // Shared materials
+        this.treeTrunkMaterial.dispose();
+        this.treeCrownMaterial.dispose();
+        this.smallTreeCrownMaterial.dispose();
+        this.bushMaterial.dispose();
+        this.rockMaterial.dispose();
+        this.grassMaterial.dispose();
     }
 }
