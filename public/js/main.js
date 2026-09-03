@@ -12,63 +12,47 @@ import { VeyraEnvironment } from "./environment.js";
 // ============================================================
 
 // ------------------------------------------------------------
-// DOM
+// DOM ELEMENTS
 // ------------------------------------------------------------
 
-const container =
-    document.getElementById("game-container");
-
-const loadingScreen =
-    document.getElementById("loading-screen");
-
-const loadingProgress =
-    document.getElementById("loading-progress");
-
-const loadingText =
-    document.getElementById("loading-text");
+const container = document.getElementById("game-container");
+const loadingScreen = document.getElementById("loading-screen");
+const loadingProgress = document.getElementById("loading-progress");
+const loadingText = document.getElementById("loading-text");
 
 // ------------------------------------------------------------
-// SAFETY
+// SAFETY CHECK
 // ------------------------------------------------------------
 
 if (!container) {
-
-    throw new Error(
-        "Game container #game-container not found."
-    );
+    throw new Error("Game container #game-container not found.");
 }
 
 // ============================================================
 // SCENE
 // ============================================================
 
-const scene =
-    new THREE.Scene();
+const scene = new THREE.Scene();
 
-const skyColor =
-    new THREE.Color(0x87a7b5);
+const skyColor = new THREE.Color(0x87a7b5);
 
-scene.background =
-    skyColor;
+scene.background = skyColor;
 
-scene.fog =
-    new THREE.FogExp2(
-        skyColor,
-        0.0018
-    );
+scene.fog = new THREE.FogExp2(
+    skyColor,
+    0.0018
+);
 
 // ============================================================
 // CAMERA
 // ============================================================
 
-const camera =
-    new THREE.PerspectiveCamera(
-        65,
-        window.innerWidth /
-        window.innerHeight,
-        0.1,
-        5000
-    );
+const camera = new THREE.PerspectiveCamera(
+    65,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    5000
+);
 
 camera.position.set(
     0,
@@ -86,14 +70,10 @@ camera.lookAt(
 // RENDERER
 // ============================================================
 
-const renderer =
-    new THREE.WebGLRenderer({
-
-        antialias: true,
-
-        powerPreference:
-            "high-performance"
-    });
+const renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    powerPreference: "high-performance"
+});
 
 renderer.setSize(
     window.innerWidth,
@@ -107,8 +87,7 @@ renderer.setPixelRatio(
     )
 );
 
-renderer.shadowMap.enabled =
-    true;
+renderer.shadowMap.enabled = true;
 
 renderer.shadowMap.type =
     THREE.PCFSoftShadowMap;
@@ -119,8 +98,7 @@ renderer.outputColorSpace =
 renderer.toneMapping =
     THREE.ACESFilmicToneMapping;
 
-renderer.toneMappingExposure =
-    1.0;
+renderer.toneMappingExposure = 1.0;
 
 container.appendChild(
     renderer.domElement
@@ -131,7 +109,7 @@ container.appendChild(
 // ============================================================
 
 // ------------------------------------------------------------
-// HEMISPHERE
+// HEMISPHERE LIGHT
 // ------------------------------------------------------------
 
 const hemisphereLight =
@@ -161,36 +139,22 @@ sun.position.set(
     200
 );
 
-sun.castShadow =
-    true;
+sun.castShadow = true;
 
 // ------------------------------------------------------------
-// SHADOW SETTINGS
+// SUN SHADOW SETTINGS
 // ------------------------------------------------------------
 
-sun.shadow.mapSize.width =
-    2048;
+sun.shadow.mapSize.width = 2048;
+sun.shadow.mapSize.height = 2048;
 
-sun.shadow.mapSize.height =
-    2048;
+sun.shadow.camera.left = -500;
+sun.shadow.camera.right = 500;
+sun.shadow.camera.top = 500;
+sun.shadow.camera.bottom = -500;
 
-sun.shadow.camera.left =
-    -500;
-
-sun.shadow.camera.right =
-    500;
-
-sun.shadow.camera.top =
-    500;
-
-sun.shadow.camera.bottom =
-    -500;
-
-sun.shadow.camera.near =
-    1;
-
-sun.shadow.camera.far =
-    1500;
+sun.shadow.camera.near = 1;
+sun.shadow.camera.far = 1500;
 
 scene.add(
     sun
@@ -204,10 +168,9 @@ let terrain = null;
 
 try {
 
-    terrain =
-        new VeyraTerrain(
-            scene
-        );
+    terrain = new VeyraTerrain(
+        scene
+    );
 
     console.log(
         "Terrain: READY"
@@ -229,10 +192,9 @@ let water = null;
 
 try {
 
-    water =
-        new VeyraWater(
-            scene
-        );
+    water = new VeyraWater(
+        scene
+    );
 
     console.log(
         "Water: READY"
@@ -287,8 +249,7 @@ function setLoading(
     if (loadingProgress) {
 
         loadingProgress.style.width =
-loadingProgress.style.width =
-    progress + "%";
+            progress + "%";
     }
 
     if (loadingText) {
@@ -391,7 +352,7 @@ setTimeout(() => {
 }, 2000);
 
 // ============================================================
-// RESIZE
+// WINDOW RESIZE
 // ============================================================
 
 window.addEventListener(
@@ -465,7 +426,7 @@ function updateWorld(
 }
 
 // ============================================================
-// GAME LOOP
+// MAIN GAME LOOP
 // ============================================================
 
 function animate() {
@@ -492,13 +453,13 @@ function animate() {
 }
 
 // ============================================================
-// START
+// START GAME LOOP
 // ============================================================
 
 animate();
 
 // ============================================================
-// DEBUG
+// DEBUG INFORMATION
 // ============================================================
 
 console.log(
