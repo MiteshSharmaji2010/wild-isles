@@ -1,11 +1,24 @@
 // ============================================================
 // WILD ISLES
-// public/js/water.js
-// Veyra Island - Realistic Water System v0.7
+// VEYRA ISLAND
+// WATER SYSTEM v0.8
+//
+// Ocean
+// Waves
+// Shoreline
+// Water Level
+// Reflection Support
+// Animated Surface
+// Performance Optimized
 // ============================================================
 
 import * as THREE from
     "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
+
+
+// ============================================================
+// WATER CLASS
+// ============================================================
 
 export class VeyraWater {
 
@@ -13,9 +26,15 @@ export class VeyraWater {
 
         this.scene = scene;
 
+        // =====================================================
+        // SETTINGS
+        // =====================================================
+
         this.waterLevel = 1.8;
 
         this.size = 1000;
+
+        this.segments = 120;
 
         this.time = 0;
 
@@ -23,122 +42,269 @@ export class VeyraWater {
 
         this.waveSpeed = 0.35;
 
+        // =====================================================
+        // OBJECTS
+        // =====================================================
+
         this.waterMesh = null;
+
         this.shoreMesh = null;
 
+        this.waterGeometry = null;
+
+        this.originalPositions = null;
+
+        // =====================================================
+        // CREATE
+        // =====================================================
+
         this.createWater();
+
         this.createShoreline();
 
-        console.log("Veyra Water v0.7 READY");
+        console.log(
+            "Veyra Water v0.8 READY"
+        );
     }
 
 
     // ========================================================
-    // MAIN WATER
+    // CREATE WATER
     // ========================================================
 
     createWater() {
 
-        const geometry = new THREE.PlaneGeometry(
-            this.size,
-            this.size,
-            120,
-            120
+        const geometry =
+            new THREE.PlaneGeometry(
+                this.size,
+                this.size,
+                this.segments,
+                this.segments
+            );
+
+        geometry.rotateX(
+            -Math.PI / 2
         );
 
-        geometry.rotateX(-Math.PI / 2);
 
-        const material = new THREE.MeshStandardMaterial({
+        // ====================================================
+        // MATERIAL
+        // ====================================================
 
-            color: 0x245f68,
+        const material =
+            new THREE.MeshStandardMaterial({
 
-            roughness: 0.15,
+                color:
+                    0x245f68,
 
-            metalness: 0.05,
+                roughness:
+                    0.15,
 
-            transparent: true,
+                metalness:
+                    0.05,
 
-            opacity: 0.82,
+                transparent:
+                    true,
 
-            side: THREE.DoubleSide
-        });
+                opacity:
+                    0.82,
 
-        this.waterMesh = new THREE.Mesh(
-            geometry,
-            material
+                side:
+                    THREE.DoubleSide
+            });
+
+
+        // ====================================================
+        // MESH
+        // ====================================================
+
+        const mesh =
+            new THREE.Mesh(
+                geometry,
+                material
+            );
+
+        mesh.position.y =
+            this.waterLevel;
+
+        mesh.receiveShadow =
+            true;
+
+        mesh.castShadow =
+            false;
+
+
+        // ====================================================
+        // SCENE
+        // ====================================================
+
+        this.scene.add(
+            mesh
         );
 
-        this.waterMesh.position.y = this.waterLevel;
 
-        this.waterMesh.receiveShadow = true;
+        // ====================================================
+        // STORE
+        // ====================================================
 
-        this.scene.add(this.waterMesh);
+        this.waterMesh =
+            mesh;
 
-        this.waterGeometry = geometry;
+        this.waterGeometry =
+            geometry;
 
         this.originalPositions =
-            geometry.attributes.position.array.slice();
+            geometry.attributes
+                .position
+                .array
+                .slice();
     }
 
 
     // ========================================================
-    // SHORELINE
+    // CREATE SHORELINE
     // ========================================================
 
     createShoreline() {
 
-        const geometry = new THREE.RingGeometry(
-            390,
-            465,
-            160
+        const geometry =
+            new THREE.RingGeometry(
+                390,
+                465,
+                160
+            );
+
+        geometry.rotateX(
+            -Math.PI / 2
         );
 
-        geometry.rotateX(-Math.PI / 2);
 
-        const material = new THREE.MeshStandardMaterial({
+        // ====================================================
+        // SHORE MATERIAL
+        // ====================================================
 
-            color: 0xc8b889,
+        const material =
+            new THREE.MeshStandardMaterial({
 
-            roughness: 1.0,
+                color:
+                    0xc8b889,
 
-            metalness: 0,
+                roughness:
+                    1.0,
 
-            transparent: true,
+                metalness:
+                    0,
 
-            opacity: 0.65,
+                transparent:
+                    true,
 
-            side: THREE.DoubleSide
-        });
+                opacity:
+                    0.65,
 
-        this.shoreMesh = new THREE.Mesh(
-            geometry,
-            material
-        );
+                side:
+                    THREE.DoubleSide
+            });
 
-        this.shoreMesh.position.y =
+
+        // ====================================================
+        // SHORE MESH
+        // ====================================================
+
+        const mesh =
+            new THREE.Mesh(
+                geometry,
+                material
+            );
+
+        mesh.position.y =
             this.waterLevel - 0.03;
 
-        this.scene.add(this.shoreMesh);
+        mesh.receiveShadow =
+            true;
+
+        mesh.castShadow =
+            false;
+
+
+        // ====================================================
+        // SCENE
+        // ====================================================
+
+        this.scene.add(
+            mesh
+        );
+
+        this.shoreMesh =
+            mesh;
     }
 
 
     // ========================================================
-    // WATER ANIMATION
+    // UPDATE WATER
     // ========================================================
 
-    update(deltaTime, elapsedTime) {
+    update(
+        deltaTime,
+        elapsedTime
+    ) {
 
-        if (!this.waterMesh) return;
+        if (
+            !this.waterMesh ||
+            !this.waterGeometry ||
+            !this.originalPositions
+        ) {
 
-        this.time += deltaTime || 0.016;
+            return;
+        }
 
-        const geometry = this.waterGeometry;
+        // ====================================================
+        // DELTA SAFETY
+        // ====================================================
+
+        if (
+            !Number.isFinite(
+                deltaTime
+            )
+        ) {
+
+            deltaTime =
+                0.016;
+        }
+
+        deltaTime =
+            Math.min(
+                Math.max(
+                    deltaTime,
+                    0
+                ),
+                0.05
+            );
+
+
+        // ====================================================
+        // TIME
+        // ====================================================
+
+        this.time +=
+            deltaTime;
+
+
+        // ====================================================
+        // POSITION
+        // ====================================================
 
         const position =
-            geometry.attributes.position;
+            this.waterGeometry
+                .attributes
+                .position;
 
         const original =
             this.originalPositions;
+
+
+        // ====================================================
+        // WAVES
+        // ====================================================
 
         for (
             let i = 0;
@@ -146,54 +312,114 @@ export class VeyraWater {
             i++
         ) {
 
-            const x = original[i * 3];
+            const index =
+                i * 3;
 
-            const z = original[i * 3 + 2];
+            const x =
+                original[index];
+
+            const z =
+                original[index + 2];
+
+
+            // ------------------------------------------------
+            // PRIMARY WAVE
+            // ------------------------------------------------
 
             const wave1 =
                 Math.sin(
                     x * 0.035 +
-                    this.time * this.waveSpeed
-                ) * this.waveHeight;
+                    this.time *
+                    this.waveSpeed
+                ) *
+                this.waveHeight;
+
+
+            // ------------------------------------------------
+            // SECONDARY WAVE
+            // ------------------------------------------------
 
             const wave2 =
                 Math.cos(
                     z * 0.045 +
-                    this.time * this.waveSpeed * 0.8
-                ) * this.waveHeight * 0.65;
+                    this.time *
+                    this.waveSpeed *
+                    0.8
+                ) *
+                this.waveHeight *
+                0.65;
+
+
+            // ------------------------------------------------
+            // LONG WAVE
+            // ------------------------------------------------
 
             const wave3 =
                 Math.sin(
-                    (x + z) * 0.018 +
-                    this.time * 0.25
-                ) * 0.06;
+                    (
+                        x +
+                        z
+                    ) *
+                    0.018 +
+                    this.time *
+                    0.25
+                ) *
+                0.06;
+
+
+            // ------------------------------------------------
+            // FINAL WAVE
+            // ------------------------------------------------
+
+            const finalWave =
+                wave1 +
+                wave2 +
+                wave3;
 
             position.setY(
                 i,
-                wave1 + wave2 + wave3
+                finalWave
             );
         }
 
-        position.needsUpdate = true;
 
-        geometry.computeVertexNormals();
+        // ====================================================
+        // UPDATE GPU
+        // ====================================================
+
+        position.needsUpdate =
+            true;
 
 
         // ====================================================
-        // SUBTLE WATER MATERIAL ANIMATION
+        // NORMALS
         // ====================================================
 
-        if (this.waterMesh.material) {
+        this.waterGeometry
+            .computeVertexNormals();
+
+
+        // ====================================================
+        // WATER OPACITY
+        // ====================================================
+
+        if (
+            this.waterMesh.material
+        ) {
 
             this.waterMesh.material.opacity =
                 0.78 +
-                Math.sin(this.time * 0.5) * 0.025;
+                Math.sin(
+                    this.time *
+                    0.5
+                ) *
+                0.025;
         }
     }
 
 
     // ========================================================
-    // WATER HEIGHT
+    // GET WATER LEVEL
     // ========================================================
 
     getWaterLevel() {
@@ -203,10 +429,13 @@ export class VeyraWater {
 
 
     // ========================================================
-    // CHECK WATER
+    // WATER CHECK
     // ========================================================
 
-    isWater(x, z) {
+    isWater(
+        x,
+        z
+    ) {
 
         const distance =
             Math.sqrt(
@@ -214,40 +443,199 @@ export class VeyraWater {
                 z * z
             );
 
-        return distance > 410;
+        return (
+            distance >
+            410
+        );
     }
 
 
     // ========================================================
-    // CLEANUP
+    // CHECK POSITION
+    // ========================================================
+
+    isUnderwater(
+        x,
+        y,
+        z
+    ) {
+
+        if (
+            !Number.isFinite(y)
+        ) {
+
+            return false;
+        }
+
+        return (
+            y <
+            this.waterLevel
+        );
+    }
+
+
+    // ========================================================
+    // WATER HEIGHT
+    // ========================================================
+
+    getHeight(
+        x,
+        z
+    ) {
+
+        const wave1 =
+            Math.sin(
+                x * 0.035 +
+                this.time *
+                this.waveSpeed
+            ) *
+            this.waveHeight;
+
+        const wave2 =
+            Math.cos(
+                z * 0.045 +
+                this.time *
+                this.waveSpeed *
+                0.8
+            ) *
+            this.waveHeight *
+            0.65;
+
+        const wave3 =
+            Math.sin(
+                (
+                    x +
+                    z
+                ) *
+                0.018 +
+                this.time *
+                0.25
+            ) *
+            0.06;
+
+        return (
+            this.waterLevel +
+            wave1 +
+            wave2 +
+            wave3
+        );
+    }
+
+
+    // ========================================================
+    // SHORE CHECK
+    // ========================================================
+
+    isNearShore(
+        x,
+        z,
+        distance = 25
+    ) {
+
+        const radialDistance =
+            Math.sqrt(
+                x * x +
+                z * z
+            );
+
+        return (
+            Math.abs(
+                radialDistance -
+                410
+            ) <=
+            distance
+        );
+    }
+
+
+    // ========================================================
+    // DISPOSE
     // ========================================================
 
     dispose() {
 
-        if (this.waterMesh) {
+        // ====================================================
+        // WATER
+        // ====================================================
 
-            this.waterMesh.geometry.dispose();
-
-            this.waterMesh.material.dispose();
+        if (
+            this.waterMesh
+        ) {
 
             this.scene.remove(
                 this.waterMesh
             );
 
-            this.waterMesh = null;
+            if (
+                this.waterMesh.geometry
+            ) {
+
+                this.waterMesh
+                    .geometry
+                    .dispose();
+            }
+
+            if (
+                this.waterMesh.material
+            ) {
+
+                this.waterMesh
+                    .material
+                    .dispose();
+            }
+
+            this.waterMesh =
+                null;
         }
 
-        if (this.shoreMesh) {
 
-            this.shoreMesh.geometry.dispose();
+        // ====================================================
+        // SHORE
+        // ====================================================
 
-            this.shoreMesh.material.dispose();
+        if (
+            this.shoreMesh
+        ) {
 
             this.scene.remove(
                 this.shoreMesh
             );
 
-            this.shoreMesh = null;
+            if (
+                this.shoreMesh.geometry
+            ) {
+
+                this.shoreMesh
+                    .geometry
+                    .dispose();
+            }
+
+            if (
+                this.shoreMesh.material
+            ) {
+
+                this.shoreMesh
+                    .material
+                    .dispose();
+            }
+
+            this.shoreMesh =
+                null;
         }
+
+
+        // ====================================================
+        // REFERENCES
+        // ====================================================
+
+        this.waterGeometry =
+            null;
+
+        this.originalPositions =
+            null;
+
+        console.log(
+            "Veyra Water disposed"
+        );
     }
 }
