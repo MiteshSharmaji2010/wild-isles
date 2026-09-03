@@ -2,7 +2,7 @@
 // WILD ISLES
 // VEYRA ISLAND
 // MAIN GAME
-// STEP 6 - PLAYER
+// STEP 7 - THIRD PERSON CAMERA
 // ============================================================
 
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
@@ -13,20 +13,13 @@ import { VeyraEnvironment } from "./environment.js";
 import { Player } from "./player.js";
 
 // ============================================================
-// GAME VARIABLES
+// DOM
 // ============================================================
 
-const container =
-    document.getElementById("game-container");
-
-const loadingScreen =
-    document.getElementById("loading-screen");
-
-const loadingProgress =
-    document.getElementById("loading-progress");
-
-const loadingText =
-    document.getElementById("loading-text");
+const container = document.getElementById("game-container");
+const loadingScreen = document.getElementById("loading-screen");
+const loadingProgress = document.getElementById("loading-progress");
+const loadingText = document.getElementById("loading-text");
 
 // ============================================================
 // LOADING
@@ -35,13 +28,11 @@ const loadingText =
 function setLoading(progress, message) {
 
     if (loadingProgress) {
-        loadingProgress.style.width =
-            progress + "%";
+        loadingProgress.style.width = progress + "%";
     }
 
     if (loadingText) {
-        loadingText.textContent =
-            message;
+        loadingText.textContent = message;
     }
 }
 
@@ -49,8 +40,7 @@ function setLoading(progress, message) {
 // SCENE
 // ============================================================
 
-const scene =
-    new THREE.Scene();
+const scene = new THREE.Scene();
 
 scene.background =
     new THREE.Color(0x87a9b5);
@@ -75,12 +65,6 @@ const camera =
         2000
     );
 
-camera.position.set(
-    0,
-    6,
-    10
-);
-
 // ============================================================
 // RENDERER
 // ============================================================
@@ -104,14 +88,15 @@ renderer.setPixelRatio(
 );
 
 renderer.shadowMap.enabled = true;
-
 renderer.shadowMap.type =
     THREE.PCFSoftShadowMap;
 
-container.appendChild(renderer.domElement);
+container.appendChild(
+    renderer.domElement
+);
 
 // ============================================================
-// LIGHTING
+// LIGHT
 // ============================================================
 
 const hemisphereLight =
@@ -121,7 +106,9 @@ const hemisphereLight =
         1.8
     );
 
-scene.add(hemisphereLight);
+scene.add(
+    hemisphereLight
+);
 
 const sun =
     new THREE.DirectionalLight(
@@ -151,7 +138,7 @@ sun.shadow.camera.far = 800;
 scene.add(sun);
 
 // ============================================================
-// WORLD
+// TERRAIN
 // ============================================================
 
 setLoading(
@@ -160,7 +147,13 @@ setLoading(
 );
 
 const terrain =
-    new VeyraTerrain(scene);
+    new VeyraTerrain(
+        scene
+    );
+
+// ============================================================
+// WATER
+// ============================================================
 
 setLoading(
     40,
@@ -168,7 +161,13 @@ setLoading(
 );
 
 const water =
-    new VeyraWater(scene);
+    new VeyraWater(
+        scene
+    );
+
+// ============================================================
+// ENVIRONMENT
+// ============================================================
 
 setLoading(
     60,
@@ -197,15 +196,105 @@ const player =
     );
 
 // ============================================================
-// CAMERA SETTINGS
+// CAMERA CONTROL
 // ============================================================
 
-const cameraOffset =
-    new THREE.Vector3(
-        0,
-        5,
-        9
-    );
+let cameraYaw = 0;
+let cameraPitch = 0.28;
+
+const cameraDistance = 8;
+const cameraHeight = 3.8;
+
+let mouseDown = false;
+
+let lastMouseX = 0;
+let lastMouseY = 0;
+
+const mouseSensitivity = 0.006;
+
+// ============================================================
+// MOUSE CONTROL
+// ============================================================
+
+renderer.domElement.addEventListener(
+    "mousedown",
+    (event) => {
+
+        mouseDown = true;
+
+        lastMouseX =
+            event.clientX;
+
+        lastMouseY =
+            event.clientY;
+    }
+);
+
+window.addEventListener(
+    "mouseup",
+    () => {
+
+        mouseDown = false;
+    }
+);
+
+window.addEventListener(
+    "mousemove",
+    (event) => {
+
+        if (!mouseDown) {
+            return;
+        }
+
+        const deltaX =
+            event.clientX -
+            lastMouseX;
+
+        const deltaY =
+            event.clientY -
+            lastMouseY;
+
+        lastMouseX =
+            event.clientX;
+
+        lastMouseY =
+            event.clientY;
+
+        cameraYaw -=
+            deltaX *
+            mouseSensitivity;
+
+        cameraPitch -=
+            deltaY *
+            mouseSensitivity;
+
+        cameraPitch =
+            THREE.MathUtils.clamp(
+                cameraPitch,
+                -0.15,
+                1.15
+            );
+    }
+);
+
+// ============================================================
+// RIGHT CLICK DISABLE
+// ============================================================
+
+renderer.domElement.addEventListener(
+    "contextmenu",
+    (event) => {
+
+        event.preventDefault();
+    }
+);
+
+// ============================================================
+// CAMERA UPDATE
+// ============================================================
+
+const cameraPosition =
+    new THREE.Vector3();
 
 const cameraTarget =
     new THREE.Vector3();
@@ -215,36 +304,72 @@ function updateCamera(delta) {
     const playerPosition =
         player.getPosition();
 
-    cameraTarget.set(
-        playerPosition.x,
-        playerPosition.y + 1.2,
-        playerPosition.z
+    // Camera direction
+    const horizontalDistance =
+        Math.cos(cameraPitch) *
+        cameraDistance;
+
+    const verticalDistance =
+        Math.sin(cameraPitch) *
+        cameraDistance;
+
+    const offsetX =
+        Math.sin(cameraYaw) *
+        horizontalDistance;
+
+    const offsetZ =
+        Math.cos(cameraYaw) *
+        horizontalDistance;
+
+    // Desired camera position
+    cameraPosition.set(
+        playerPosition.x +
+            offsetX,
+
+        playerPosition.y +
+            cameraHeight +
+            verticalDistance,
+
+        playerPosition.z +
+            offsetZ
     );
 
-    const desiredPosition =
-        new THREE.Vector3(
-            playerPosition.x +
-            cameraOffset.x,
-
-            playerPosition.y +
-            cameraOffset.y,
-
-            playerPosition.z +
-            cameraOffset.z
-        );
-
+    // Smooth camera
     camera.position.lerp(
-        desiredPosition,
+        cameraPosition,
         Math.min(
             1,
-            delta * 5
+            delta * 8
         )
+    );
+
+    // Look at player
+    cameraTarget.set(
+        playerPosition.x,
+        playerPosition.y + 1.25,
+        playerPosition.z
     );
 
     camera.lookAt(
         cameraTarget
     );
 }
+
+// ============================================================
+// CAMERA START POSITION
+// ============================================================
+
+cameraYaw =
+    Math.PI;
+
+cameraPitch =
+    0.25;
+
+camera.position.set(
+    0,
+    6,
+    10
+);
 
 // ============================================================
 // RESIZE
@@ -301,7 +426,9 @@ function animate() {
         clock.elapsedTime;
 
     // Player
-    player.update(delta);
+    player.update(
+        delta
+    );
 
     // Environment
     environment.update(
@@ -316,7 +443,9 @@ function animate() {
     );
 
     // Camera
-    updateCamera(delta);
+    updateCamera(
+        delta
+    );
 
     // Render
     renderer.render(
@@ -326,7 +455,7 @@ function animate() {
 }
 
 // ============================================================
-// START
+// START GAME
 // ============================================================
 
 setLoading(
@@ -351,5 +480,5 @@ setTimeout(
 animate();
 
 console.log(
-    "WILD ISLES: GAME STARTED"
+    "WILD ISLES: STEP 7 READY"
 );
