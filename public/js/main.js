@@ -287,7 +287,8 @@ function setLoading(
     if (loadingProgress) {
 
         loadingProgress.style.width =
-            `${progress}%`;
+loadingProgress.style.width =
+    progress + "%";
     }
 
     if (loadingText) {
