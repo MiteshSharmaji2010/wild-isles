@@ -1,4 +1,15 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
+import { VeyraTerrain } from "./terrain.js";
+
+// ============================================================
+// WILD ISLES
+// VEYRA ISLAND
+// WORLD FOUNDATION
+// ============================================================
+
+// ------------------------------------------------------------
+// DOM ELEMENTS
+// ------------------------------------------------------------
 
 const container = document.getElementById("game-container");
 const loadingScreen = document.getElementById("loading-screen");
@@ -6,16 +17,26 @@ const loadingProgress = document.getElementById("loading-progress");
 const loadingText = document.getElementById("loading-text");
 
 // ------------------------------------------------------------
-// THREE.JS SCENE
+// BASIC SAFETY CHECK
+// ------------------------------------------------------------
+
+if (!container) {
+    throw new Error("Game container #game-container not found.");
+}
+
+// ------------------------------------------------------------
+// SCENE
 // ------------------------------------------------------------
 
 const scene = new THREE.Scene();
 
-scene.background = new THREE.Color(0x87a7b5);
+const skyColor = new THREE.Color(0x87a7b5);
+
+scene.background = skyColor;
 
 scene.fog = new THREE.FogExp2(
-    0x87a7b5,
-    0.0025
+    skyColor,
+    0.0018
 );
 
 // ------------------------------------------------------------
@@ -23,14 +44,23 @@ scene.fog = new THREE.FogExp2(
 // ------------------------------------------------------------
 
 const camera = new THREE.PerspectiveCamera(
-    70,
+    65,
     window.innerWidth / window.innerHeight,
     0.1,
     5000
 );
 
-camera.position.set(0, 35, 80);
-camera.lookAt(0, 0, 0);
+camera.position.set(
+    0,
+    120,
+    260
+);
+
+camera.lookAt(
+    0,
+    30,
+    0
+);
 
 // ------------------------------------------------------------
 // RENDERER
@@ -47,32 +77,53 @@ renderer.setSize(
 );
 
 renderer.setPixelRatio(
-    Math.min(window.devicePixelRatio, 2)
+    Math.min(
+        window.devicePixelRatio || 1,
+        1.5
+    )
 );
 
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.type =
+    THREE.PCFSoftShadowMap;
 
-container.appendChild(renderer.domElement);
+renderer.outputColorSpace =
+    THREE.SRGBColorSpace;
 
-// ------------------------------------------------------------
-// LIGHTING
-// ------------------------------------------------------------
+renderer.toneMapping =
+    THREE.ACESFilmicToneMapping;
 
-const ambientLight = new THREE.HemisphereLight(
-    0xddeeff,
-    0x34452f,
-    1.5
+renderer.toneMappingExposure = 1.0;
+
+container.appendChild(
+    renderer.domElement
 );
 
-scene.add(ambientLight);
+// ------------------------------------------------------------
+// HEMISPHERE LIGHT
+// ------------------------------------------------------------
 
-const sun = new THREE.DirectionalLight(
-    0xffffff,
-    2.5
+const hemisphereLight =
+    new THREE.HemisphereLight(
+        0xddeeff,
+        0x34452f,
+        1.5
+    );
+
+scene.add(
+    hemisphereLight
 );
+
+// ------------------------------------------------------------
+// SUN
+// ------------------------------------------------------------
+
+const sun =
+    new THREE.DirectionalLight(
+        0xffffff,
+        2.5
+    );
 
 sun.position.set(
     300,
@@ -82,6 +133,10 @@ sun.position.set(
 
 sun.castShadow = true;
 
+// ------------------------------------------------------------
+// SUN SHADOW SETTINGS
+// ------------------------------------------------------------
+
 sun.shadow.mapSize.width = 2048;
 sun.shadow.mapSize.height = 2048;
 
@@ -90,116 +145,253 @@ sun.shadow.camera.right = 500;
 sun.shadow.camera.top = 500;
 sun.shadow.camera.bottom = -500;
 
-scene.add(sun);
+sun.shadow.camera.near = 1;
+sun.shadow.camera.far = 1500;
 
-// ------------------------------------------------------------
-// TEMPORARY WORLD MARKER
-// ------------------------------------------------------------
-
-const groundGeometry = new THREE.PlaneGeometry(
-    1000,
-    1000
+scene.add(
+    sun
 );
 
-const groundMaterial = new THREE.MeshStandardMaterial({
-    color: 0x526b43,
-    roughness: 1,
-    metalness: 0
-});
-
-const ground = new THREE.Mesh(
-    groundGeometry,
-    groundMaterial
-);
-
-ground.rotation.x = -Math.PI / 2;
-
-ground.receiveShadow = true;
-
-scene.add(ground);
-
 // ------------------------------------------------------------
-// LOADING
+// TERRAIN
 // ------------------------------------------------------------
 
-function setLoading(progress, text) {
+let terrain = null;
 
-    loadingProgress.style.width = `${progress}%`;
-    loadingText.textContent = text;
+try {
+
+    terrain = new VeyraTerrain(scene);
+
+    console.log(
+        "Veyra Island terrain created successfully."
+    );
+
+} catch (error) {
+
+    console.error(
+        "Veyra Island terrain creation failed:",
+        error
+    );
+
 }
 
-setLoading(20, "Initializing renderer...");
+// ------------------------------------------------------------
+// LOADING SYSTEM
+// ------------------------------------------------------------
+
+function setLoading(progress, message) {
+
+    if (loadingProgress) {
+
+        loadingProgress.style.width =
+            `${progress}%`;
+
+    }
+
+    if (loadingText) {
+
+        loadingText.textContent =
+            message;
+
+    }
+}
+
+// ------------------------------------------------------------
+// START LOADING
+// ------------------------------------------------------------
+
+setLoading(
+    5,
+    "Starting WILD ISLES..."
+);
 
 setTimeout(() => {
 
-    setLoading(50, "Creating Veyra Island...");
+    setLoading(
+        20,
+        "Initializing graphics..."
+    );
 
-}, 300);
-
-setTimeout(() => {
-
-    setLoading(80, "Preparing environment...");
-
-}, 600);
+}, 200);
 
 setTimeout(() => {
 
-    setLoading(100, "World ready.");
+    setLoading(
+        40,
+        "Preparing Veyra Island..."
+    );
+
+}, 400);
+
+setTimeout(() => {
+
+    setLoading(
+        60,
+        "Generating terrain..."
+    );
+
+}, 650);
+
+setTimeout(() => {
+
+    setLoading(
+        80,
+        "Preparing atmosphere..."
+    );
 
 }, 900);
 
 setTimeout(() => {
 
-    loadingScreen.classList.add("hidden");
-
-}, 1300);
-
-// ------------------------------------------------------------
-// RESIZE
-// ------------------------------------------------------------
-
-window.addEventListener("resize", () => {
-
-    camera.aspect =
-        window.innerWidth /
-        window.innerHeight;
-
-    camera.updateProjectionMatrix();
-
-    renderer.setSize(
-        window.innerWidth,
-        window.innerHeight
+    setLoading(
+        100,
+        "Veyra Island ready."
     );
 
-    renderer.setPixelRatio(
-        Math.min(window.devicePixelRatio, 2)
-    );
-});
+}, 1200);
+
+setTimeout(() => {
+
+    if (loadingScreen) {
+
+        loadingScreen.classList.add(
+            "hidden"
+        );
+
+    }
+
+}, 1600);
 
 // ------------------------------------------------------------
-// GAME LOOP
+// WINDOW RESIZE
 // ------------------------------------------------------------
 
-const clock = new THREE.Clock();
+window.addEventListener(
+    "resize",
+    () => {
+
+        const width =
+            window.innerWidth;
+
+        const height =
+            window.innerHeight;
+
+        camera.aspect =
+            width / height;
+
+        camera.updateProjectionMatrix();
+
+        renderer.setSize(
+            width,
+            height
+        );
+
+        renderer.setPixelRatio(
+            Math.min(
+                window.devicePixelRatio || 1,
+                1.5
+            )
+        );
+
+    }
+);
+
+// ------------------------------------------------------------
+// CLOCK
+// ------------------------------------------------------------
+
+const clock =
+    new THREE.Clock();
+
+// ------------------------------------------------------------
+// WORLD UPDATE
+// ------------------------------------------------------------
+
+function updateWorld(delta) {
+
+    // Future systems will be added here.
+
+    // Examples:
+    //
+    // weather.update(delta);
+    // dayNight.update(delta);
+    // wildlife.update(delta);
+    // water.update(delta);
+    // infrastructure.update(delta);
+
+}
+
+// ------------------------------------------------------------
+// MAIN GAME LOOP
+// ------------------------------------------------------------
 
 function animate() {
 
-    requestAnimationFrame(animate);
+    requestAnimationFrame(
+        animate
+    );
 
-    const delta = clock.getDelta();
+    const delta =
+        clock.getDelta();
 
-    // Future:
-    // player.update(delta);
-    // world.update(delta);
-    // weather.update(delta);
+    updateWorld(
+        delta
+    );
 
     renderer.render(
         scene,
         camera
     );
+
 }
+
+// ------------------------------------------------------------
+// START RENDER LOOP
+// ------------------------------------------------------------
 
 animate();
 
-console.log("WILD ISLES engine initialized.");
-console.log("Veyra Island world foundation loaded.");
+// ------------------------------------------------------------
+// DEBUG INFORMATION
+// ------------------------------------------------------------
+
+console.log(
+    "======================================"
+);
+
+console.log(
+    "          WILD ISLES"
+);
+
+console.log(
+    "          VEYRA ISLAND"
+);
+
+console.log(
+    "       WORLD FOUNDATION v0.1"
+);
+
+console.log(
+    "======================================"
+);
+
+console.log(
+    "Three.js Engine: READY"
+);
+
+console.log(
+    "Renderer: READY"
+);
+
+console.log(
+    "Lighting: READY"
+);
+
+console.log(
+    "Terrain: " +
+    (terrain ? "READY" : "FAILED")
+);
+
+console.log(
+    "======================================"
+);
