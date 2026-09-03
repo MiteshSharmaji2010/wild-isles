@@ -1,31 +1,357 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
+
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     >
 
+    <meta
+        name="theme-color"
+        content="#101713"
+    >
+
+    <meta
+        name="description"
+        content="WILD ISLES - Veyra Island"
+    >
+
     <title>WILD ISLES</title>
 
-    <link rel="stylesheet" href="./public/css/style.css">
+    <link
+        rel="stylesheet"
+        href="./public/css/style.css"
+    >
+
 </head>
+
 
 <body>
 
-    <div id="game-container"></div>
+    <!-- =====================================================
+         GAME CONTAINER
+         ===================================================== -->
 
-    <div id="loading-screen">
-        <div class="loading-title">WILD ISLES</div>
-        <div class="loading-subtitle">VEYRA ISLAND</div>
-        <div class="loading-bar">
-            <div id="loading-progress"></div>
+    <div
+        id="game-container"
+        aria-label="WILD ISLES Game"
+    ></div>
+
+
+    <!-- =====================================================
+         LOADING SCREEN
+         ===================================================== -->
+
+    <div
+        id="loading-screen"
+    >
+
+        <div
+            class="loading-content"
+        >
+
+            <div
+                class="loading-title"
+            >
+                WILD ISLES
+            </div>
+
+
+            <div
+                class="loading-subtitle"
+            >
+                VEYRA ISLAND
+            </div>
+
+
+            <div
+                class="loading-line"
+            ></div>
+
+
+            <div
+                class="loading-status"
+            >
+                INITIALIZING WORLD
+            </div>
+
+
+            <div
+                class="loading-bar"
+            >
+
+                <div
+                    id="loading-progress"
+                ></div>
+
+            </div>
+
+
+            <div
+                id="loading-text"
+            >
+                Preparing Veyra Island...
+            </div>
+
         </div>
-        <div id="loading-text">Initializing world...</div>
+
     </div>
 
-    <script type="module" src="./public/js/main.js"></script>
+
+    <!-- =====================================================
+         BASIC GAME UI
+         Will be expanded later.
+         ===================================================== -->
+
+    <div
+        id="game-ui"
+        class="game-ui hidden"
+    >
+
+        <!-- TOP LEFT PLAYER STATUS -->
+
+        <div
+            id="player-status"
+            class="hud-panel"
+        >
+
+            <div
+                class="hud-player-name"
+            >
+                KIAN
+            </div>
+
+
+            <div
+                class="hud-health"
+            >
+
+                <span>
+                    HEALTH
+                </span>
+
+                <div
+                    class="hud-bar"
+                >
+
+                    <div
+                        id="health-fill"
+                        class="hud-bar-fill health-fill"
+                    ></div>
+
+                </div>
+
+            </div>
+
+
+            <div
+                class="hud-stamina"
+            >
+
+                <span>
+                    STAMINA
+                </span>
+
+                <div
+                    class="hud-bar"
+                >
+
+                    <div
+                        id="stamina-fill"
+                        class="hud-bar-fill stamina-fill"
+                    ></div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- TOP RIGHT -->
+
+        <div
+            id="world-status"
+            class="hud-panel world-panel"
+        >
+
+            <div
+                id="world-time"
+            >
+                DAY 1
+            </div>
+
+
+            <div
+                id="world-location"
+            >
+                VEYRA ISLAND
+            </div>
+
+        </div>
+
+
+        <!-- CENTER INTERACTION -->
+
+        <div
+            id="interaction-message"
+            class="interaction-message"
+        ></div>
+
+
+        <!-- CROSSHAIR -->
+
+        <div
+            id="crosshair"
+            class="crosshair"
+        >
+
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+
+        </div>
+
+
+        <!-- BOTTOM LEFT -->
+
+        <div
+            id="survival-status"
+            class="hud-panel survival-panel"
+        >
+
+            <div>
+                HUNGER
+                <strong id="hunger-value">
+                    100
+                </strong>
+            </div>
+
+            <div>
+                THIRST
+                <strong id="thirst-value">
+                    100
+                </strong>
+            </div>
+
+            <div>
+                TEMP
+                <strong id="temperature-value">
+                    20°C
+                </strong>
+            </div>
+
+        </div>
+
+
+        <!-- BOTTOM CENTER -->
+
+        <div
+            id="controls-hint"
+            class="controls-hint"
+        >
+
+            <span>
+                W A S D
+            </span>
+
+            MOVE
+
+            <span>
+                SHIFT
+            </span>
+
+            RUN
+
+            <span>
+                SPACE
+            </span>
+
+            JUMP
+
+        </div>
+
+
+        <!-- DEBUG -->
+
+        <div
+            id="debug-info"
+            class="debug-info"
+        ></div>
+
+    </div>
+
+
+    <!-- =====================================================
+         MOBILE HUD
+         ===================================================== -->
+
+    <div
+        id="mobile-ui"
+        class="mobile-ui hidden"
+    >
+
+        <div
+            id="mobile-joystick"
+            class="mobile-joystick"
+        >
+
+            <div
+                id="joystick-knob"
+            ></div>
+
+        </div>
+
+
+        <div
+            class="mobile-actions"
+        >
+
+            <button
+                id="mobile-run"
+                class="mobile-button"
+                type="button"
+            >
+                RUN
+            </button>
+
+
+            <button
+                id="mobile-jump"
+                class="mobile-button"
+                type="button"
+            >
+                JUMP
+            </button>
+
+
+            <button
+                id="mobile-action"
+                class="mobile-button"
+                type="button"
+            >
+                ACTION
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <!-- =====================================================
+         GAME SCRIPT
+         ===================================================== -->
+
+    <script
+        type="module"
+        src="./public/js/main.js"
+    ></script>
 
 </body>
+
 </html>
