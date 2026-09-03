@@ -1,7 +1,7 @@
 // ============================================================
 // WILD ISLES
 // VEYRA ISLAND
-// MAIN GAME ENGINE v0.6
+// MAIN GAME ENGINE v0.7
 //
 // Scene
 // Camera
@@ -15,6 +15,7 @@
 // Loading
 // Mouse Camera
 // Keyboard
+// Mobile
 // Responsive
 // ============================================================
 
@@ -32,6 +33,7 @@ import { VeyraEnvironment }
 import { Player }
     from "./player.js";
 
+
 // ============================================================
 // GAME CLASS
 // ============================================================
@@ -40,9 +42,9 @@ class WildIslesGame {
 
     constructor() {
 
-        // ----------------------------------------------------
+        // =====================================================
         // CORE
-        // ----------------------------------------------------
+        // =====================================================
 
         this.scene = null;
         this.camera = null;
@@ -53,26 +55,25 @@ class WildIslesGame {
         this.environment = null;
         this.player = null;
 
-        // ----------------------------------------------------
+        // =====================================================
         // CLOCK
-        // ----------------------------------------------------
+        // =====================================================
 
-        this.clock =
-            new THREE.Clock();
+        this.clock = new THREE.Clock();
 
         this.elapsedTime = 0;
 
-        // ----------------------------------------------------
+        // =====================================================
         // CAMERA
-        // ----------------------------------------------------
+        // =====================================================
 
         this.cameraYaw = Math.PI;
 
         this.cameraPitch = 0.28;
 
-        this.cameraDistance = 8;
+        this.cameraDistance = 7.2;
 
-        this.cameraHeight = 3.8;
+        this.cameraHeight = 2.9;
 
         this.cameraSensitivity = 0.003;
 
@@ -82,18 +83,24 @@ class WildIslesGame {
         this.cameraPosition =
             new THREE.Vector3();
 
-        // ----------------------------------------------------
+        // =====================================================
+        // CAMERA SMOOTHING
+        // =====================================================
+
+        this.cameraInitialized = false;
+
+        // =====================================================
         // MOUSE
-        // ----------------------------------------------------
+        // =====================================================
 
         this.mouseDown = false;
 
         this.lastMouseX = 0;
         this.lastMouseY = 0;
 
-        // ----------------------------------------------------
+        // =====================================================
         // WORLD
-        // ----------------------------------------------------
+        // =====================================================
 
         this.day = 1;
 
@@ -101,9 +108,9 @@ class WildIslesGame {
 
         this.dayLength = 600;
 
-        // ----------------------------------------------------
+        // =====================================================
         // GAME STATE
-        // ----------------------------------------------------
+        // =====================================================
 
         this.started = false;
 
@@ -113,9 +120,9 @@ class WildIslesGame {
             window.innerWidth <= 900 ||
             "ontouchstart" in window;
 
-        // ----------------------------------------------------
+        // =====================================================
         // DOM
-        // ----------------------------------------------------
+        // =====================================================
 
         this.loadingScreen =
             document.getElementById(
@@ -142,12 +149,13 @@ class WildIslesGame {
                 "mobile-ui"
             );
 
-        // ----------------------------------------------------
+        // =====================================================
         // START
-        // ----------------------------------------------------
+        // =====================================================
 
         this.init();
     }
+
 
     // ========================================================
     // INITIALIZE
@@ -242,8 +250,9 @@ class WildIslesGame {
         }
     }
 
+
     // ========================================================
-    // CREATE SCENE
+    // SCENE
     // ========================================================
 
     createScene() {
@@ -251,18 +260,10 @@ class WildIslesGame {
         this.scene =
             new THREE.Scene();
 
-        // ----------------------------------------------------
-        // SKY
-        // ----------------------------------------------------
-
         this.scene.background =
             new THREE.Color(
                 0x9db8c2
             );
-
-        // ----------------------------------------------------
-        // FOG
-        // ----------------------------------------------------
 
         this.scene.fog =
             new THREE.FogExp2(
@@ -277,8 +278,9 @@ class WildIslesGame {
         );
     }
 
+
     // ========================================================
-    // CREATE CAMERA
+    // CAMERA
     // ========================================================
 
     createCamera() {
@@ -294,8 +296,14 @@ class WildIslesGame {
 
         this.camera.position.set(
             0,
-            8,
-            12
+            5,
+            10
+        );
+
+        this.camera.lookAt(
+            0,
+            2,
+            0
         );
 
         console.log(
@@ -303,15 +311,18 @@ class WildIslesGame {
         );
     }
 
+
     // ========================================================
-    // CREATE RENDERER
+    // RENDERER
     // ========================================================
 
     createRenderer() {
 
         this.renderer =
             new THREE.WebGLRenderer({
+
                 antialias: true,
+
                 powerPreference:
                     "high-performance"
             });
@@ -328,10 +339,6 @@ class WildIslesGame {
             )
         );
 
-        // ----------------------------------------------------
-        // COLOR
-        // ----------------------------------------------------
-
         this.renderer.outputColorSpace =
             THREE.SRGBColorSpace;
 
@@ -341,19 +348,11 @@ class WildIslesGame {
         this.renderer.toneMappingExposure =
             1.0;
 
-        // ----------------------------------------------------
-        // SHADOWS
-        // ----------------------------------------------------
-
         this.renderer.shadowMap.enabled =
             true;
 
         this.renderer.shadowMap.type =
             THREE.PCFSoftShadowMap;
-
-        // ----------------------------------------------------
-        // DOM
-        // ----------------------------------------------------
 
         const container =
             document.getElementById(
@@ -378,15 +377,12 @@ class WildIslesGame {
         );
     }
 
+
     // ========================================================
     // LIGHTING
     // ========================================================
 
     createLights() {
-
-        // ----------------------------------------------------
-        // HEMISPHERE
-        // ----------------------------------------------------
 
         const hemisphere =
             new THREE.HemisphereLight(
@@ -405,9 +401,10 @@ class WildIslesGame {
             hemisphere
         );
 
-        // ----------------------------------------------------
+
+        // ====================================================
         // SUN
-        // ----------------------------------------------------
+        // ====================================================
 
         this.sun =
             new THREE.DirectionalLight(
@@ -454,9 +451,10 @@ class WildIslesGame {
             this.sun
         );
 
-        // ----------------------------------------------------
+
+        // ====================================================
         // SOFT FILL
-        // ----------------------------------------------------
+        // ====================================================
 
         const fill =
             new THREE.DirectionalLight(
@@ -479,6 +477,7 @@ class WildIslesGame {
         );
     }
 
+
     // ========================================================
     // TERRAIN
     // ========================================================
@@ -495,6 +494,7 @@ class WildIslesGame {
         );
     }
 
+
     // ========================================================
     // WATER
     // ========================================================
@@ -510,6 +510,7 @@ class WildIslesGame {
             "Water connected"
         );
     }
+
 
     // ========================================================
     // ENVIRONMENT
@@ -528,11 +529,16 @@ class WildIslesGame {
         );
     }
 
+
     // ========================================================
     // PLAYER
     // ========================================================
 
     createPlayer() {
+
+        // IMPORTANT:
+        // Player v0.8 expects:
+        // new Player(scene, terrain)
 
         this.player =
             new Player(
@@ -549,15 +555,16 @@ class WildIslesGame {
         );
     }
 
+
     // ========================================================
     // CONTROLS
     // ========================================================
 
     setupControls() {
 
-        // ----------------------------------------------------
+        // ====================================================
         // MOUSE DOWN
-        // ----------------------------------------------------
+        // ====================================================
 
         window.addEventListener(
             "mousedown",
@@ -581,9 +588,10 @@ class WildIslesGame {
             }
         );
 
-        // ----------------------------------------------------
+
+        // ====================================================
         // MOUSE UP
-        // ----------------------------------------------------
+        // ====================================================
 
         window.addEventListener(
             "mouseup",
@@ -593,9 +601,10 @@ class WildIslesGame {
             }
         );
 
-        // ----------------------------------------------------
+
+        // ====================================================
         // MOUSE MOVE
-        // ----------------------------------------------------
+        // ====================================================
 
         window.addEventListener(
             "mousemove",
@@ -641,17 +650,17 @@ class WildIslesGame {
                     this.player
                 ) {
 
-                    this.player
-                        .setCameraRotation(
-                            this.cameraYaw
-                        );
+                    this.player.setCameraRotation(
+                        this.cameraYaw
+                    );
                 }
             }
         );
 
-        // ----------------------------------------------------
-        // PREVENT CONTEXT MENU
-        // ----------------------------------------------------
+
+        // ====================================================
+        // CONTEXT MENU
+        // ====================================================
 
         window.addEventListener(
             "contextmenu",
@@ -661,12 +670,14 @@ class WildIslesGame {
             }
         );
 
-        // ----------------------------------------------------
+
+        // ====================================================
         // MOBILE
-        // ----------------------------------------------------
+        // ====================================================
 
         this.setupMobileControls();
     }
+
 
     // ========================================================
     // MOBILE CONTROLS
@@ -685,16 +696,15 @@ class WildIslesGame {
             this.mobileUI
         ) {
 
-            this.mobileUI
-                .classList
-                .remove(
-                    "hidden"
-                );
+            this.mobileUI.classList.remove(
+                "hidden"
+            );
         }
 
-        // ----------------------------------------------------
+
+        // ====================================================
         // RUN
-        // ----------------------------------------------------
+        // ====================================================
 
         const runButton =
             document.getElementById(
@@ -749,9 +759,10 @@ class WildIslesGame {
             );
         }
 
-        // ----------------------------------------------------
+
+        // ====================================================
         // JUMP
-        // ----------------------------------------------------
+        // ====================================================
 
         const jumpButton =
             document.getElementById(
@@ -778,9 +789,10 @@ class WildIslesGame {
             );
         }
 
-        // ----------------------------------------------------
+
+        // ====================================================
         // ACTION
-        // ----------------------------------------------------
+        // ====================================================
 
         const actionButton =
             document.getElementById(
@@ -798,7 +810,7 @@ class WildIslesGame {
                     event.preventDefault();
 
                     this.showInteraction(
-                        "ACTION SYSTEM COMING SOON"
+                        "NO INTERACTION NEARBY"
                     );
                 },
                 {
@@ -807,6 +819,7 @@ class WildIslesGame {
             );
         }
     }
+
 
     // ========================================================
     // RESIZE
@@ -847,6 +860,7 @@ class WildIslesGame {
         );
     }
 
+
     // ========================================================
     // UI
     // ========================================================
@@ -857,35 +871,25 @@ class WildIslesGame {
             this.gameUI
         ) {
 
-            this.gameUI
-                .classList
-                .remove(
-                    "hidden"
-                );
-        }
-
-        const debug =
-            document.getElementById(
-                "debug-info"
+            this.gameUI.classList.remove(
+                "hidden"
             );
-
-        if (
-            debug
-        ) {
-
-            debug.textContent =
-                "";
         }
+
+        this.updatePlayerUI();
+        this.updateWorldUI();
     }
+
 
     // ========================================================
     // CAMERA FOLLOW
     // ========================================================
 
-    updateCamera() {
+    updateCamera(deltaTime) {
 
         if (
-            !this.player
+            !this.player ||
+            !this.camera
         ) {
 
             return;
@@ -894,20 +898,25 @@ class WildIslesGame {
         const playerPosition =
             this.player.getPosition();
 
-        // ----------------------------------------------------
-        // TARGET
-        // ----------------------------------------------------
+
+        // ====================================================
+        // CAMERA TARGET
+        // ====================================================
 
         this.cameraTarget.set(
+
             playerPosition.x,
+
             playerPosition.y +
             this.cameraHeight,
+
             playerPosition.z
         );
 
-        // ----------------------------------------------------
-        // CAMERA SPHERICAL POSITION
-        // ----------------------------------------------------
+
+        // ====================================================
+        // CAMERA DISTANCE
+        // ====================================================
 
         const horizontalDistance =
             Math.cos(
@@ -920,6 +929,11 @@ class WildIslesGame {
                 this.cameraPitch
             ) *
             this.cameraDistance;
+
+
+        // ====================================================
+        // CAMERA POSITION
+        // ====================================================
 
         this.cameraPosition.set(
 
@@ -940,55 +954,82 @@ class WildIslesGame {
             horizontalDistance
         );
 
-        // ----------------------------------------------------
-        // CAMERA COLLISION / TERRAIN
-        // ----------------------------------------------------
 
-        const cameraGround =
-            this.terrain.getGroundHeight(
-                this.cameraPosition.x,
-                this.cameraPosition.z
-            );
-
-        const minimumCameraHeight =
-            cameraGround + 1.1;
+        // ====================================================
+        // TERRAIN CAMERA COLLISION
+        // ====================================================
 
         if (
-            this.cameraPosition.y <
-            minimumCameraHeight
+            this.terrain
         ) {
 
-            this.cameraPosition.y =
-                minimumCameraHeight;
+            const cameraGround =
+                this.terrain.getGroundHeight(
+                    this.cameraPosition.x,
+                    this.cameraPosition.z
+                );
+
+            const minimumCameraHeight =
+                cameraGround + 1.4;
+
+            if (
+                this.cameraPosition.y <
+                minimumCameraHeight
+            ) {
+
+                this.cameraPosition.y =
+                    minimumCameraHeight;
+            }
         }
 
-        // ----------------------------------------------------
-        // SMOOTH FOLLOW
-        // ----------------------------------------------------
+
+        // ====================================================
+        // CAMERA SMOOTHING
+        //
+        // IMPORTANT:
+        // deltaTime is passed from animate().
+        // clock.getDelta() is NOT called here.
+        // ====================================================
 
         const smoothing =
             1 -
             Math.pow(
                 0.001,
-                this.clock.getDelta()
+                deltaTime * 8
             );
 
-        this.camera.position.lerp(
-            this.cameraPosition,
-            Math.min(
-                1,
-                smoothing
-            )
-        );
+        if (
+            !this.cameraInitialized
+        ) {
 
-        // ----------------------------------------------------
+            this.camera.position.copy(
+                this.cameraPosition
+            );
+
+            this.cameraInitialized = true;
+
+        } else {
+
+            this.camera.position.lerp(
+                this.cameraPosition,
+                THREE.MathUtils.clamp(
+                    smoothing,
+                    0,
+                    1
+                )
+            );
+        }
+
+
+        // ====================================================
         // LOOK AT
-        // ----------------------------------------------------
+        // ====================================================
 
         this.camera.lookAt(
             this.cameraTarget
         );
     }
+
 
     // ========================================================
     // WORLD TIME
@@ -998,8 +1039,7 @@ class WildIslesGame {
 
         this.worldTime +=
             deltaTime *
-            (24 /
-                this.dayLength);
+            (24 / this.dayLength);
 
         if (
             this.worldTime >= 24
@@ -1015,6 +1055,7 @@ class WildIslesGame {
         this.updateWorldUI();
     }
 
+
     // ========================================================
     // SUN
     // ========================================================
@@ -1029,8 +1070,7 @@ class WildIslesGame {
         }
 
         const normalized =
-            this.worldTime /
-            24;
+            this.worldTime / 24;
 
         const angle =
             normalized *
@@ -1045,7 +1085,8 @@ class WildIslesGame {
             Math.sin(angle) *
             300;
 
-        const sunZ = 100;
+        const sunZ =
+            100;
 
         this.sun.position.set(
             sunX,
@@ -1065,12 +1106,12 @@ class WildIslesGame {
 
         this.sun.intensity =
             0.7 +
-            daylight *
-            2.4;
+            daylight * 2.4;
     }
 
+
     // ========================================================
-    // UI UPDATE
+    // WORLD UI
     // ========================================================
 
     updateWorldUI() {
@@ -1099,8 +1140,7 @@ class WildIslesGame {
                     (
                         this.worldTime -
                         hour
-                    ) *
-                    60
+                    ) * 60
                 );
 
             const formattedHour =
@@ -1134,6 +1174,7 @@ class WildIslesGame {
         this.updatePlayerUI();
     }
 
+
     // ========================================================
     // PLAYER UI
     // ========================================================
@@ -1157,27 +1198,93 @@ class WildIslesGame {
                 "stamina-fill"
             );
 
+        const hunger =
+            document.getElementById(
+                "hunger-value"
+            );
+
+        const thirst =
+            document.getElementById(
+                "thirst-value"
+            );
+
+        const temperature =
+            document.getElementById(
+                "temperature-value"
+            );
+
+        // ====================================================
+        // HEALTH
+        // ====================================================
+
         if (
             health
         ) {
 
+            const healthPercent =
+                THREE.MathUtils.clamp(
+                    this.player.health,
+                    0,
+                    100
+                );
+
             health.style.width =
-                "100%";
+                `${healthPercent}%`;
         }
+
+
+        // ====================================================
+        // STAMINA
+        // ====================================================
 
         if (
             stamina
         ) {
 
+            const staminaPercent =
+                THREE.MathUtils.clamp(
+                    this.player.stamina,
+                    0,
+                    100
+                );
+
             stamina.style.width =
-                this.player.running
-                    ? "65%"
-                    : "100%";
+                `${staminaPercent}%`;
         }
 
-        // ----------------------------------------------------
+
+        // ====================================================
+        // SURVIVAL
+        // ====================================================
+
+        if (
+            hunger
+        ) {
+
+            hunger.textContent =
+                "100";
+        }
+
+        if (
+            thirst
+        ) {
+
+            thirst.textContent =
+                "100";
+        }
+
+        if (
+            temperature
+        ) {
+
+            temperature.textContent =
+                "20°C";
+        }
+
+
+        // ====================================================
         // DEBUG
-        // ----------------------------------------------------
+        // ====================================================
 
         const debug =
             document.getElementById(
@@ -1185,7 +1292,8 @@ class WildIslesGame {
             );
 
         if (
-            debug
+            debug &&
+            this.player.getDebugInfo
         ) {
 
             const info =
@@ -1196,8 +1304,9 @@ class WildIslesGame {
         }
     }
 
+
     // ========================================================
-    // INTERACTION MESSAGE
+    // INTERACTION
     // ========================================================
 
     showInteraction(
@@ -1240,6 +1349,7 @@ class WildIslesGame {
             );
     }
 
+
     // ========================================================
     // LOADING
     // ========================================================
@@ -1265,6 +1375,7 @@ class WildIslesGame {
                 text;
         }
     }
+
 
     // ========================================================
     // START GAME
@@ -1301,11 +1412,9 @@ class WildIslesGame {
             this.gameUI
         ) {
 
-            this.gameUI
-                .classList
-                .remove(
-                    "hidden"
-                );
+            this.gameUI.classList.remove(
+                "hidden"
+            );
         }
 
         this.updateWorldTime(0);
@@ -1316,6 +1425,7 @@ class WildIslesGame {
             "WILD ISLES STARTED"
         );
     }
+
 
     // ========================================================
     // ANIMATION LOOP
@@ -1334,6 +1444,10 @@ class WildIslesGame {
             return;
         }
 
+        // ====================================================
+        // GET DELTA ONLY ONCE
+        // ====================================================
+
         const deltaTime =
             Math.min(
                 this.clock.getDelta(),
@@ -1343,9 +1457,10 @@ class WildIslesGame {
         this.elapsedTime +=
             deltaTime;
 
-        // ----------------------------------------------------
+
+        // ====================================================
         // PLAYER
-        // ----------------------------------------------------
+        // ====================================================
 
         if (
             this.player
@@ -1357,27 +1472,33 @@ class WildIslesGame {
             );
         }
 
-        // ----------------------------------------------------
+
+        // ====================================================
         // CAMERA
-        // ----------------------------------------------------
+        // ====================================================
 
-        this.updateCamera();
+        this.updateCamera(
+            deltaTime
+        );
 
-        // ----------------------------------------------------
+
+        // ====================================================
         // WORLD
-        // ----------------------------------------------------
+        // ====================================================
 
         this.updateWorldTime(
             deltaTime
         );
 
-        // ----------------------------------------------------
+
+        // ====================================================
         // ENVIRONMENT
-        // ----------------------------------------------------
+        // ====================================================
 
         if (
             this.environment &&
-            this.environment.update
+            typeof this.environment.update ===
+            "function"
         ) {
 
             this.environment.update(
@@ -1386,13 +1507,15 @@ class WildIslesGame {
             );
         }
 
-        // ----------------------------------------------------
+
+        // ====================================================
         // WATER
-        // ----------------------------------------------------
+        // ====================================================
 
         if (
             this.water &&
-            this.water.update
+            typeof this.water.update ===
+            "function"
         ) {
 
             this.water.update(
@@ -1401,15 +1524,17 @@ class WildIslesGame {
             );
         }
 
-        // ----------------------------------------------------
+
+        // ====================================================
         // RENDER
-        // ----------------------------------------------------
+        // ====================================================
 
         this.renderer.render(
             this.scene,
             this.camera
         );
     }
+
 
     // ========================================================
     // WAIT
@@ -1429,6 +1554,7 @@ class WildIslesGame {
             }
         );
     }
+
 
     // ========================================================
     // FATAL ERROR
@@ -1473,8 +1599,9 @@ class WildIslesGame {
     }
 }
 
+
 // ============================================================
-// START
+// START GAME
 // ============================================================
 
 window.addEventListener(
