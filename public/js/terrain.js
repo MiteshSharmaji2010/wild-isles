@@ -15,14 +15,17 @@ export class VeyraTerrain {
 
     getHeight(x, z) {
 
-        const distance =
-            Math.sqrt(x * x + z * z);
+        const distance = Math.sqrt(
+            x * x + z * z
+        );
 
-        // Island center is higher
-        const islandShape =
-            Math.max(0, 1 - distance / 430);
+        // Main island shape
+        const islandShape = Math.max(
+            0,
+            1 - distance / 430
+        );
 
-        // Large hills
+        // Large natural hills
         const large =
             Math.sin(x * 0.012) *
             Math.cos(z * 0.010) *
@@ -34,7 +37,7 @@ export class VeyraTerrain {
             Math.cos(z * 0.028) *
             8;
 
-        // Small natural variation
+        // Small terrain detail
         const small =
             Math.sin(x * 0.09) *
             Math.cos(z * 0.075) *
@@ -44,12 +47,11 @@ export class VeyraTerrain {
             (large + medium + small) *
             islandShape;
 
-        // Center mountain region
-        const mountainDistance =
-            Math.sqrt(
-                Math.pow(x + 80, 2) +
-                Math.pow(z + 40, 2)
-            );
+        // Central mountain range
+        const mountainDistance = Math.sqrt(
+            Math.pow(x + 80, 2) +
+            Math.pow(z + 40, 2)
+        );
 
         if (mountainDistance < 170) {
 
@@ -63,13 +65,13 @@ export class VeyraTerrain {
                 ) * 95;
         }
 
-        // Keep coastline low
+        // Lower coastline
         if (distance > 330) {
-            const coastFactor =
-                Math.min(
-                    1,
-                    (distance - 330) / 100
-                );
+
+            const coastFactor = Math.min(
+                1,
+                (distance - 330) / 100
+            );
 
             height -= coastFactor * 18;
         }
@@ -99,10 +101,10 @@ export class VeyraTerrain {
             const x = position.getX(i);
             const z = position.getY(i);
 
-            const y =
+            const height =
                 this.getHeight(x, z);
 
-            position.setZ(i, y);
+            position.setZ(i, height);
         }
 
         geometry.rotateX(-Math.PI / 2);
@@ -111,9 +113,9 @@ export class VeyraTerrain {
 
         const material =
             new THREE.MeshStandardMaterial({
-                color: 0x596f45,
-                roughness: 1,
-                metalness: 0
+                color: 0x526b43,
+                roughness: 1.0,
+                metalness: 0.0
             });
 
         this.mesh =
