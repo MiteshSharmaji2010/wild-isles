@@ -1,16 +1,18 @@
+```javascript
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
 
 import { VeyraTerrain } from "./terrain.js";
 import { VeyraWater } from "./water.js";
+import { VeyraEnvironment } from "./environment.js";
 
 // ============================================================
 // WILD ISLES
 // VEYRA ISLAND
-// WORLD FOUNDATION
+// WORLD FOUNDATION v0.3
 // ============================================================
 
 // ------------------------------------------------------------
-// DOM ELEMENTS
+// DOM
 // ------------------------------------------------------------
 
 const container =
@@ -26,7 +28,7 @@ const loadingText =
     document.getElementById("loading-text");
 
 // ------------------------------------------------------------
-// SAFETY CHECK
+// SAFETY
 // ------------------------------------------------------------
 
 if (!container) {
@@ -36,9 +38,9 @@ if (!container) {
     );
 }
 
-// ------------------------------------------------------------
+// ============================================================
 // SCENE
-// ------------------------------------------------------------
+// ============================================================
 
 const scene =
     new THREE.Scene();
@@ -55,9 +57,9 @@ scene.fog =
         0.0018
     );
 
-// ------------------------------------------------------------
+// ============================================================
 // CAMERA
-// ------------------------------------------------------------
+// ============================================================
 
 const camera =
     new THREE.PerspectiveCamera(
@@ -80,9 +82,9 @@ camera.lookAt(
     0
 );
 
-// ------------------------------------------------------------
+// ============================================================
 // RENDERER
-// ------------------------------------------------------------
+// ============================================================
 
 const renderer =
     new THREE.WebGLRenderer({
@@ -124,8 +126,12 @@ container.appendChild(
     renderer.domElement
 );
 
+// ============================================================
+// LIGHTING
+// ============================================================
+
 // ------------------------------------------------------------
-// HEMISPHERE LIGHT
+// HEMISPHERE
 // ------------------------------------------------------------
 
 const hemisphereLight =
@@ -159,7 +165,7 @@ sun.castShadow =
     true;
 
 // ------------------------------------------------------------
-// SUN SHADOW
+// SHADOW SETTINGS
 // ------------------------------------------------------------
 
 sun.shadow.mapSize.width =
@@ -204,7 +210,7 @@ try {
         );
 
     console.log(
-        "Veyra Island terrain created successfully."
+        "Terrain: READY"
     );
 
 } catch (error) {
@@ -229,7 +235,7 @@ try {
         );
 
     console.log(
-        "Veyra Island water created successfully."
+        "Water: READY"
     );
 
 } catch (error) {
@@ -240,9 +246,38 @@ try {
     );
 }
 
-// ------------------------------------------------------------
+// ============================================================
+// ENVIRONMENT
+// ============================================================
+
+let environment = null;
+
+if (terrain) {
+
+    try {
+
+        environment =
+            new VeyraEnvironment(
+                scene,
+                terrain
+            );
+
+        console.log(
+            "Environment: READY"
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Environment creation failed:",
+            error
+        );
+    }
+}
+
+// ============================================================
 // LOADING SYSTEM
-// ------------------------------------------------------------
+// ============================================================
 
 function setLoading(
     progress,
@@ -262,9 +297,9 @@ function setLoading(
     }
 }
 
-// ------------------------------------------------------------
+// ============================================================
 // LOADING SEQUENCE
-// ------------------------------------------------------------
+// ============================================================
 
 setLoading(
     5,
@@ -283,7 +318,7 @@ setTimeout(() => {
 setTimeout(() => {
 
     setLoading(
-        40,
+        35,
         "Preparing Veyra Island..."
     );
 
@@ -292,29 +327,47 @@ setTimeout(() => {
 setTimeout(() => {
 
     setLoading(
-        60,
+        50,
         "Generating terrain..."
     );
 
-}, 650);
+}, 600);
 
 setTimeout(() => {
 
     setLoading(
-        75,
-        "Generating coastline..."
+        65,
+        "Creating coastline..."
     );
 
-}, 850);
+}, 800);
 
 setTimeout(() => {
 
     setLoading(
-        90,
-        "Preparing ocean..."
+        78,
+        "Generating ocean..."
     );
 
-}, 1050);
+}, 1000);
+
+setTimeout(() => {
+
+    setLoading(
+        88,
+        "Growing forest..."
+    );
+
+}, 1200);
+
+setTimeout(() => {
+
+    setLoading(
+        96,
+        "Placing rocks and grass..."
+    );
+
+}, 1400);
 
 setTimeout(() => {
 
@@ -323,7 +376,7 @@ setTimeout(() => {
         "Veyra Island ready."
     );
 
-}, 1300);
+}, 1600);
 
 setTimeout(() => {
 
@@ -334,7 +387,7 @@ setTimeout(() => {
         );
     }
 
-}, 1700);
+}, 2000);
 
 // ============================================================
 // RESIZE
@@ -393,17 +446,25 @@ function updateWorld(
         );
     }
 
+    if (environment) {
+
+        environment.update(
+            delta,
+            elapsedTime
+        );
+    }
+
     // Future systems:
     //
     // weather.update(delta);
     // dayNight.update(delta);
     // wildlife.update(delta);
-    // environment.update(delta);
     // infrastructure.update(delta);
+    // worldEvents.update(delta);
 }
 
 // ============================================================
-// MAIN GAME LOOP
+// GAME LOOP
 // ============================================================
 
 function animate() {
@@ -452,7 +513,7 @@ console.log(
 );
 
 console.log(
-    "       WORLD FOUNDATION v0.2"
+    "       WORLD FOUNDATION v0.3"
 );
 
 console.log(
@@ -482,5 +543,11 @@ console.log(
 );
 
 console.log(
+    "Environment: " +
+    (environment ? "READY" : "FAILED")
+);
+
+console.log(
     "======================================"
 );
+```
