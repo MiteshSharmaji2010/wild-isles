@@ -1,26 +1,23 @@
 // ============================================================
 // WILD ISLES
 // VEYRA ISLAND
-// PLAYER SYSTEM v0.4
+// PLAYER SYSTEM v0.5
+// TERRAIN COLLISION + SLOPE PROTECTION
 // ============================================================
 
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
 
 export class Player {
 
-    constructor(
-        scene,
-        terrain,
-        cameraSystem
-    ) {
+    constructor(scene, terrain, cameraSystem) {
 
         this.scene = scene;
         this.terrain = terrain;
         this.cameraSystem = cameraSystem;
 
-        // ----------------------------------------------------
+        // ====================================================
         // MOVEMENT
-        // ----------------------------------------------------
+        // ====================================================
 
         this.walkSpeed = 4.8;
         this.runSpeed = 8.5;
@@ -35,11 +32,17 @@ export class Player {
 
         // Maximum walkable slope
         this.maxSlope =
-            THREE.MathUtils.degToRad(48);
+            THREE.MathUtils.degToRad(38);
 
-        // ----------------------------------------------------
-        // INPUT
-        // ----------------------------------------------------
+        // Extra safety for mountains
+        this.collisionRadius = 0.65;
+
+        // How far we sample around player
+        this.collisionSampleDistance = 0.75;
+
+        // ====================================================
+        // KEYS
+        // ====================================================
 
         this.keys = {
 
@@ -48,11 +51,12 @@ export class Player {
             left: false,
             right: false,
             run: false
+
         };
 
-        // ----------------------------------------------------
-        // PLAYER
-        // ----------------------------------------------------
+        // ====================================================
+        // PLAYER OBJECT
+        // ====================================================
 
         this.object =
             new THREE.Group();
@@ -66,9 +70,9 @@ export class Player {
             this.object
         );
 
-        // ----------------------------------------------------
+        // ====================================================
         // START POSITION
-        // ----------------------------------------------------
+        // ====================================================
 
         const startX = 0;
         const startZ = 0;
@@ -85,15 +89,19 @@ export class Player {
             startZ
         );
 
+        // ====================================================
+        // INPUT
+        // ====================================================
+
         this.setupKeyboard();
 
         console.log(
-            "Kian v0.4 READY"
+            "Kian Player v0.5 READY"
         );
     }
 
     // ========================================================
-    // BODY
+    // PLAYER BODY
     // ========================================================
 
     createBody() {
@@ -252,7 +260,7 @@ export class Player {
         );
 
         // ----------------------------------------------------
-        // JACKET / VEST
+        // VEST
         // ----------------------------------------------------
 
         const vestGeometry =
@@ -476,11 +484,239 @@ export class Player {
         this.velocityY =
             this.jumpForce;
 
-        this.isGrounded = false;
+        this.isGrounded =
+            false;
     }
 
     // ========================================================
-    // MOVEMENT
+    // CHECK SLOPE
+    // ========================================================
+
+    canStandAt(x, z) {
+
+        const slope =
+            this.terrain.getSlopeAngle(
+                x,
+                z
+            );
+
+        return slope <=
+            this.maxSlope;
+    }
+
+    // ========================================================
+    // CHECK TERRAIN COLLISION
+    // ========================================================
+
+    isSafePosition(x, z) {
+
+        const centerSlope =
+            this.terrain.getSlopeAngle(
+                x,
+                z
+            );
+
+        // -----------------------------------------------
+        // Main slope check
+        // -----------------------------------------------
+
+        if (
+            centerSlope >
+            this.maxSlope
+        ) {
+            return false;
+        }
+
+        // -----------------------------------------------
+        // Sample around player
+        // This prevents entering steep mountain edges.
+        // -----------------------------------------------
+
+        const r =
+            this.collisionSampleDistance;
+
+        const samples = [
+
+            [x + r, z],
+            [x - r, z],
+            [x, z + r],
+            [x, z - r],
+
+            [x + r, z + r],
+            [x - r, z + r],
+            [x + r, z - r],
+            [x - r, z - r]
+
+        ];
+
+        for (
+            let i = 0;
+            i < samples.length;
+            i++
+        ) {
+
+            const sx =
+                samples[i][0];
+
+            const sz =
+                samples[i][1];
+
+            const slope =
+                this.terrain.getSlopeAngle(
+                    sx,
+                    sz
+                );
+
+            if (
+                slope >
+                this.maxSlope
+            ) {
+                return false;
+            }
+        }
+
+        // -----------------------------------------------
+        // Ground height safety
+        // -----------------------------------------------
+
+        const centerHeight =
+            this.terrain.getGroundHeight(
+                x,
+                z
+            );
+
+        const surroundingHeights = [
+
+            this.terrain.getGroundHeight(
+                x + r,
+                z
+            ),
+
+            this.terrain.getGroundHeight(
+                x - r,
+                z
+            ),
+
+            this.terrain.getGroundHeight(
+                x,
+                z + r
+            ),
+
+            this.terrain.getGroundHeight(
+                x,
+                z - r
+            )
+
+        ];
+
+        let highestDifference = 0;
+
+        for (
+            let i = 0;
+            i < surroundingHeights.length;
+            i++
+        ) {
+
+            const difference =
+                Math.abs(
+                    surroundingHeights[i] -
+                    centerHeight
+                );
+
+            if (
+                difference >
+                highestDifference
+            ) {
+                highestDifference =
+                    difference;
+            }
+        }
+
+        // Prevent very sharp terrain walls
+        if (
+            highestDifference >
+            7.5
+        ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    // ========================================================
+    // SAFE MOVEMENT
+    // ========================================================
+
+    tryMove(
+        currentX,
+        currentZ,
+        targetX,
+        targetZ
+    ) {
+
+        // -----------------------------------------------
+        // Full movement
+        // -----------------------------------------------
+
+        if (
+            this.isSafePosition(
+                targetX,
+                targetZ
+            )
+        ) {
+
+            return {
+                x: targetX,
+                z: targetZ
+            };
+        }
+
+        // -----------------------------------------------
+        // X ONLY
+        // -----------------------------------------------
+
+        if (
+            this.isSafePosition(
+                targetX,
+                currentZ
+            )
+        ) {
+
+            return {
+                x: targetX,
+                z: currentZ
+            };
+        }
+
+        // -----------------------------------------------
+        // Z ONLY
+        // -----------------------------------------------
+
+        if (
+            this.isSafePosition(
+                currentX,
+                targetZ
+            )
+        ) {
+
+            return {
+                x: currentX,
+                z: targetZ
+            };
+        }
+
+        // -----------------------------------------------
+        // No safe movement
+        // -----------------------------------------------
+
+        return {
+            x: currentX,
+            z: currentZ
+        };
+    }
+
+    // ========================================================
+    // UPDATE
     // ========================================================
 
     update(delta) {
@@ -491,6 +727,10 @@ export class Player {
         ) {
             return;
         }
+
+        // ====================================================
+        // INPUT
+        // ====================================================
 
         let inputX = 0;
         let inputZ = 0;
@@ -517,7 +757,9 @@ export class Player {
                 inputZ * inputZ
             );
 
-        if (inputLength > 0) {
+        if (
+            inputLength > 0
+        ) {
 
             inputX /=
                 inputLength;
@@ -526,9 +768,9 @@ export class Player {
                 inputLength;
         }
 
-        // ----------------------------------------------------
-        // CAMERA RELATIVE
-        // ----------------------------------------------------
+        // ====================================================
+        // CAMERA RELATIVE MOVEMENT
+        // ====================================================
 
         const yaw =
             this.cameraSystem
@@ -549,9 +791,9 @@ export class Player {
             inputX * sin +
             inputZ * cos;
 
-        // ----------------------------------------------------
-        // SPEED
-        // ----------------------------------------------------
+        // ====================================================
+        // RUN
+        // ====================================================
 
         this.isRunning =
             this.keys.run &&
@@ -562,64 +804,72 @@ export class Player {
                 ? this.runSpeed
                 : this.walkSpeed;
 
-        // ----------------------------------------------------
-        // TEST NEW POSITION
-        // ----------------------------------------------------
+        // ====================================================
+        // TARGET POSITION
+        // ====================================================
 
-        let nextX =
-            this.object.position.x +
+        const currentX =
+            this.object.position.x;
+
+        const currentZ =
+            this.object.position.z;
+
+        const targetX =
+            currentX +
             moveX *
             speed *
             delta;
 
-        let nextZ =
-            this.object.position.z +
+        const targetZ =
+            currentZ +
             moveZ *
             speed *
             delta;
 
-        // ----------------------------------------------------
-        // SLOPE COLLISION
-        // ----------------------------------------------------
+        // ====================================================
+        // TERRAIN COLLISION
+        // ====================================================
 
-        const slope =
-            this.terrain.getSlopeAngle(
-                nextX,
-                nextZ
+        const safePosition =
+            this.tryMove(
+                currentX,
+                currentZ,
+                targetX,
+                targetZ
             );
 
+        this.object.position.x =
+            safePosition.x;
+
+        this.object.position.z =
+            safePosition.z;
+
+        // ====================================================
+        // ROTATION
+        // ====================================================
+
         if (
-            slope <=
-            this.maxSlope
+            inputLength > 0
         ) {
 
-            this.object.position.x =
-                nextX;
-
-            this.object.position.z =
-                nextZ;
-        }
-
-        // ----------------------------------------------------
-        // PLAYER ROTATION
-        // ----------------------------------------------------
-
-        if (inputLength > 0) {
-
-            const target =
+            const targetRotation =
                 Math.atan2(
                     moveX,
                     moveZ
                 );
 
             let difference =
-                target -
+                targetRotation -
                 this.object.rotation.y;
 
             difference =
                 Math.atan2(
-                    Math.sin(difference),
-                    Math.cos(difference)
+                    Math.sin(
+                        difference
+                    ),
+                    Math.cos(
+                        difference
+                    )
                 );
 
             this.object.rotation.y +=
@@ -630,9 +880,9 @@ export class Player {
                 );
         }
 
-        // ----------------------------------------------------
+        // ====================================================
         // GRAVITY
-        // ----------------------------------------------------
+        // ====================================================
 
         this.velocityY -=
             this.gravity *
@@ -642,9 +892,9 @@ export class Player {
             this.velocityY *
             delta;
 
-        // ----------------------------------------------------
+        // ====================================================
         // GROUND
-        // ----------------------------------------------------
+        // ====================================================
 
         const ground =
             this.terrain.getGroundHeight(
@@ -665,25 +915,30 @@ export class Player {
                 ground +
                 playerFootOffset;
 
-            this.velocityY = 0;
+            this.velocityY =
+                0;
 
-            this.isGrounded = true;
+            this.isGrounded =
+                true;
 
         } else {
 
-            this.isGrounded = false;
+            this.isGrounded =
+                false;
         }
 
-        // ----------------------------------------------------
-        // ISLAND LIMIT
-        // ----------------------------------------------------
+        // ====================================================
+        // ISLAND BOUNDARY
+        // ====================================================
 
-        const maxDistance = 418;
+        const maxDistance =
+            418;
 
         const distance =
             Math.sqrt(
                 this.object.position.x *
                 this.object.position.x +
+
                 this.object.position.z *
                 this.object.position.z
             );
@@ -702,14 +957,40 @@ export class Player {
 
             this.object.position.z *=
                 factor;
+
+            const newGround =
+                this.terrain.getGroundHeight(
+                    this.object.position.x,
+                    this.object.position.z
+                );
+
+            this.object.position.y =
+                newGround +
+                playerFootOffset;
+
+            this.velocityY =
+                0;
+
+            this.isGrounded =
+                true;
         }
     }
 
+    // ========================================================
+    // GET POSITION
+    // ========================================================
+
     getPosition() {
+
         return this.object.position;
     }
 
+    // ========================================================
+    // GET OBJECT
+    // ========================================================
+
     getObject() {
+
         return this.object;
     }
 }
