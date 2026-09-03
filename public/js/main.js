@@ -1,7 +1,7 @@
 // ============================================================
 // WILD ISLES
 // VEYRA ISLAND
-// MAIN GAME ENGINE v0.7
+// MAIN GAME ENGINE v0.8
 //
 // Scene
 // Camera
@@ -11,6 +11,7 @@
 // Water
 // Environment
 // Player
+// Survival
 // HUD
 // Loading
 // Mouse Camera
@@ -19,7 +20,8 @@
 // Responsive
 // ============================================================
 
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
+import * as THREE from
+    "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
 
 import { VeyraTerrain }
     from "./terrain.js";
@@ -32,6 +34,9 @@ import { VeyraEnvironment }
 
 import { Player }
     from "./player.js";
+
+import { SurvivalSystem }
+    from "./survival.js";
 
 
 // ============================================================
@@ -54,6 +59,7 @@ class WildIslesGame {
         this.water = null;
         this.environment = null;
         this.player = null;
+        this.survival = null;
 
         // =====================================================
         // CLOCK
@@ -82,10 +88,6 @@ class WildIslesGame {
 
         this.cameraPosition =
             new THREE.Vector3();
-
-        // =====================================================
-        // CAMERA SMOOTHING
-        // =====================================================
 
         this.cameraInitialized = false;
 
@@ -210,14 +212,21 @@ class WildIslesGame {
             this.createEnvironment();
 
             this.setLoading(
-                80,
+                78,
                 "Creating Kian..."
             );
 
             this.createPlayer();
 
             this.setLoading(
-                90,
+                86,
+                "Preparing survival system..."
+            );
+
+            this.createSurvival();
+
+            this.setLoading(
+                92,
                 "Connecting controls..."
             );
 
@@ -536,10 +545,6 @@ class WildIslesGame {
 
     createPlayer() {
 
-        // IMPORTANT:
-        // Player v0.8 expects:
-        // new Player(scene, terrain)
-
         this.player =
             new Player(
                 this.scene,
@@ -552,6 +557,34 @@ class WildIslesGame {
 
         console.log(
             "Player connected"
+        );
+    }
+
+
+    // ========================================================
+    // SURVIVAL
+    // ========================================================
+
+    createSurvival() {
+
+        if (
+            !this.player ||
+            !this.terrain
+        ) {
+
+            throw new Error(
+                "Player or terrain missing for Survival System."
+            );
+        }
+
+        this.survival =
+            new SurvivalSystem(
+                this.player,
+                this.terrain
+            );
+
+        console.log(
+            "Survival connected"
         );
     }
 
@@ -721,7 +754,7 @@ class WildIslesGame {
 
                     event.preventDefault();
 
-                    this.player.keys.run =
+                    this.player.keys["ShiftLeft"] =
                         true;
                 };
 
@@ -730,7 +763,7 @@ class WildIslesGame {
 
                     event.preventDefault();
 
-                    this.player.keys.run =
+                    this.player.keys["ShiftLeft"] =
                         false;
                 };
 
@@ -780,8 +813,7 @@ class WildIslesGame {
 
                     event.preventDefault();
 
-                    this.player.keys.jump =
-                        true;
+                    this.player.jump();
                 },
                 {
                     passive: false
@@ -877,6 +909,7 @@ class WildIslesGame {
         }
 
         this.updatePlayerUI();
+
         this.updateWorldUI();
     }
 
@@ -969,26 +1002,29 @@ class WildIslesGame {
                     this.cameraPosition.z
                 );
 
-            const minimumCameraHeight =
-                cameraGround + 1.4;
-
             if (
-                this.cameraPosition.y <
-                minimumCameraHeight
+                Number.isFinite(
+                    cameraGround
+                )
             ) {
 
-                this.cameraPosition.y =
-                    minimumCameraHeight;
+                const minimumCameraHeight =
+                    cameraGround + 1.4;
+
+                if (
+                    this.cameraPosition.y <
+                    minimumCameraHeight
+                ) {
+
+                    this.cameraPosition.y =
+                        minimumCameraHeight;
+                }
             }
         }
 
 
         // ====================================================
         // CAMERA SMOOTHING
-        //
-        // IMPORTANT:
-        // deltaTime is passed from animate().
-        // clock.getDelta() is NOT called here.
         // ====================================================
 
         const smoothing =
@@ -1170,8 +1206,6 @@ class WildIslesGame {
             location.textContent =
                 "VEYRA ISLAND";
         }
-
-        this.updatePlayerUI();
     }
 
 
@@ -1212,6 +1246,7 @@ class WildIslesGame {
             document.getElementById(
                 "temperature-value"
             );
+
 
         // ====================================================
         // HEALTH
@@ -1254,31 +1289,58 @@ class WildIslesGame {
 
 
         // ====================================================
-        // SURVIVAL
+        // SURVIVAL VALUES
         // ====================================================
 
         if (
-            hunger
+            this.survival
         ) {
 
-            hunger.textContent =
-                "100";
-        }
+            const status =
+                this.survival.getStatus();
 
-        if (
-            thirst
-        ) {
 
-            thirst.textContent =
-                "100";
-        }
+            if (
+                hunger
+            ) {
 
-        if (
-            temperature
-        ) {
+                hunger.textContent =
+                    String(
+                        status.hunger
+                    );
+            }
 
-            temperature.textContent =
-                "20°C";
+
+            if (
+                thirst
+            ) {
+
+                thirst.textContent =
+                    String(
+                        status.thirst
+                    );
+            }
+
+
+            if (
+                temperature
+            ) {
+
+                const temp =
+                    status.temperature;
+
+                // Convert internal 0-100
+                // to readable Celsius-like value
+
+                const celsius =
+                    Math.round(
+                        -10 +
+                        temp * 0.6
+                    );
+
+                temperature.textContent =
+                    `${celsius}°C`;
+            }
         }
 
 
@@ -1293,14 +1355,28 @@ class WildIslesGame {
 
         if (
             debug &&
-            this.player.getDebugInfo
+            typeof this.player.getDebugInfo ===
+            "function"
         ) {
 
             const info =
                 this.player.getDebugInfo();
 
+            let survivalText = "";
+
+            if (
+                this.survival
+            ) {
+
+                const status =
+                    this.survival.getStatus();
+
+                survivalText =
+                    ` | H ${status.hunger} T ${status.thirst}`;
+            }
+
             debug.textContent =
-                `X ${info.x} | Y ${info.y} | Z ${info.z} | Slope ${info.slope}°`;
+                `X ${info.x} | Y ${info.y} | Z ${info.z} | Slope ${info.slope}°${survivalText}`;
         }
     }
 
@@ -1444,8 +1520,9 @@ class WildIslesGame {
             return;
         }
 
+
         // ====================================================
-        // GET DELTA ONLY ONCE
+        // DELTA TIME
         // ====================================================
 
         const deltaTime =
@@ -1469,6 +1546,21 @@ class WildIslesGame {
             this.player.update(
                 deltaTime,
                 this.cameraYaw
+            );
+        }
+
+
+        // ====================================================
+        // SURVIVAL
+        // ====================================================
+
+        if (
+            this.survival
+        ) {
+
+            this.survival.update(
+                deltaTime,
+                this.elapsedTime
             );
         }
 
@@ -1523,6 +1615,13 @@ class WildIslesGame {
                 this.elapsedTime
             );
         }
+
+
+        // ====================================================
+        // UI
+        // ====================================================
+
+        this.updatePlayerUI();
 
 
         // ====================================================
