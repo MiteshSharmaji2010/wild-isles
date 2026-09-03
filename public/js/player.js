@@ -1,17 +1,19 @@
 // ============================================================
 // WILD ISLES
 // VEYRA ISLAND
-// PLAYER SYSTEM v0.1
+// PLAYER SYSTEM v0.2
+// CAMERA-RELATIVE MOVEMENT
 // ============================================================
 
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
 
 export class Player {
 
-    constructor(scene, terrain) {
+    constructor(scene, terrain, cameraSystem = null) {
 
         this.scene = scene;
         this.terrain = terrain;
+        this.cameraSystem = cameraSystem;
 
         // ----------------------------------------------------
         // PLAYER SETTINGS
@@ -32,7 +34,7 @@ export class Player {
         this.isRunning = false;
 
         // ----------------------------------------------------
-        // MOVEMENT
+        // INPUT
         // ----------------------------------------------------
 
         this.keys = {
@@ -44,72 +46,83 @@ export class Player {
         };
 
         // ----------------------------------------------------
-        // PLAYER OBJECT
+        // PLAYER
         // ----------------------------------------------------
 
         this.object = new THREE.Group();
+        this.object.name = "Kian";
 
         this.createBody();
 
         this.scene.add(this.object);
 
-        // Starting position
-        this.object.position.set(0, 20, 0);
+        // Start above terrain
+        const startHeight =
+            this.terrain.getHeight(0, 0);
 
-        // ----------------------------------------------------
-        // INPUT
-        // ----------------------------------------------------
+        this.object.position.set(
+            0,
+            startHeight + 0.05,
+            0
+        );
 
         this.setupKeyboard();
 
-        console.log("Kian Player System: READY");
+        console.log(
+            "Kian Player System: READY"
+        );
     }
 
     // ========================================================
-    // CREATE PLAYER
+    // PLAYER BODY
     // ========================================================
 
     createBody() {
 
-        // Body material
         const bodyMaterial =
             new THREE.MeshStandardMaterial({
-                color: 0x3d4650,
-                roughness: 0.8,
-                metalness: 0.05
+                color: 0x303840,
+                roughness: 0.82,
+                metalness: 0.02
             });
 
-        // Head material
-        const headMaterial =
+        const skinMaterial =
             new THREE.MeshStandardMaterial({
-                color: 0xb88762,
-                roughness: 0.9
+                color: 0xb77b58,
+                roughness: 0.9,
+                metalness: 0
+            });
+
+        const darkMaterial =
+            new THREE.MeshStandardMaterial({
+                color: 0x171b1f,
+                roughness: 0.95
             });
 
         // ----------------------------------------------------
-        // BODY
+        // TORSO
         // ----------------------------------------------------
 
-        const bodyGeometry =
+        const torsoGeometry =
             new THREE.CapsuleGeometry(
-                0.42,
-                0.9,
+                0.43,
+                0.82,
                 6,
                 10
             );
 
-        const body =
+        const torso =
             new THREE.Mesh(
-                bodyGeometry,
+                torsoGeometry,
                 bodyMaterial
             );
 
-        body.position.y = 1.05;
+        torso.position.y = 1.08;
 
-        body.castShadow = true;
-        body.receiveShadow = true;
+        torso.castShadow = true;
+        torso.receiveShadow = true;
 
-        this.object.add(body);
+        this.object.add(torso);
 
         // ----------------------------------------------------
         // HEAD
@@ -117,18 +130,18 @@ export class Player {
 
         const headGeometry =
             new THREE.SphereGeometry(
-                0.32,
-                12,
-                10
+                0.31,
+                16,
+                12
             );
 
         const head =
             new THREE.Mesh(
                 headGeometry,
-                headMaterial
+                skinMaterial
             );
 
-        head.position.y = 1.85;
+        head.position.y = 1.88;
 
         head.castShadow = true;
         head.receiveShadow = true;
@@ -136,33 +149,129 @@ export class Player {
         this.object.add(head);
 
         // ----------------------------------------------------
-        // SHOULDERS
+        // HAIR
         // ----------------------------------------------------
 
-        const shoulderGeometry =
-            new THREE.BoxGeometry(
-                1.05,
-                0.22,
-                0.38
+        const hairGeometry =
+            new THREE.SphereGeometry(
+                0.325,
+                12,
+                8,
+                0,
+                Math.PI * 2,
+                0,
+                Math.PI * 0.52
             );
 
-        const shoulders =
+        const hair =
             new THREE.Mesh(
-                shoulderGeometry,
+                hairGeometry,
+                darkMaterial
+            );
+
+        hair.position.y = 2.01;
+
+        hair.castShadow = true;
+
+        this.object.add(hair);
+
+        // ----------------------------------------------------
+        // LEFT ARM
+        // ----------------------------------------------------
+
+        const armGeometry =
+            new THREE.CapsuleGeometry(
+                0.12,
+                0.55,
+                5,
+                8
+            );
+
+        const leftArm =
+            new THREE.Mesh(
+                armGeometry,
                 bodyMaterial
             );
 
-        shoulders.position.y = 1.42;
+        leftArm.position.set(
+            -0.56,
+            1.18,
+            0
+        );
 
-        shoulders.castShadow = true;
+        leftArm.rotation.z =
+            -0.08;
 
-        this.object.add(shoulders);
+        leftArm.castShadow = true;
+
+        this.object.add(leftArm);
 
         // ----------------------------------------------------
-        // NAME
+        // RIGHT ARM
         // ----------------------------------------------------
 
-        this.object.name = "Kian";
+        const rightArm =
+            new THREE.Mesh(
+                armGeometry,
+                bodyMaterial
+            );
+
+        rightArm.position.set(
+            0.56,
+            1.18,
+            0
+        );
+
+        rightArm.rotation.z =
+            0.08;
+
+        rightArm.castShadow = true;
+
+        this.object.add(rightArm);
+
+        // ----------------------------------------------------
+        // LEGS
+        // ----------------------------------------------------
+
+        const legGeometry =
+            new THREE.CapsuleGeometry(
+                0.15,
+                0.68,
+                5,
+                8
+            );
+
+        const leftLeg =
+            new THREE.Mesh(
+                legGeometry,
+                darkMaterial
+            );
+
+        leftLeg.position.set(
+            -0.21,
+            0.42,
+            0
+        );
+
+        leftLeg.castShadow = true;
+
+        this.object.add(leftLeg);
+
+        const rightLeg =
+            new THREE.Mesh(
+                legGeometry,
+                darkMaterial
+            );
+
+        rightLeg.position.set(
+            0.21,
+            0.42,
+            0
+        );
+
+        rightLeg.castShadow = true;
+
+        this.object.add(rightLeg);
     }
 
     // ========================================================
@@ -178,22 +287,18 @@ export class Player {
                 switch (event.code) {
 
                     case "KeyW":
-                    case "ArrowUp":
                         this.keys.forward = true;
                         break;
 
                     case "KeyS":
-                    case "ArrowDown":
                         this.keys.backward = true;
                         break;
 
                     case "KeyA":
-                    case "ArrowLeft":
                         this.keys.left = true;
                         break;
 
                     case "KeyD":
-                    case "ArrowRight":
                         this.keys.right = true;
                         break;
 
@@ -203,7 +308,9 @@ export class Player {
                         break;
 
                     case "Space":
-                        this.jump();
+                        if (!event.repeat) {
+                            this.jump();
+                        }
                         break;
                 }
             }
@@ -216,22 +323,18 @@ export class Player {
                 switch (event.code) {
 
                     case "KeyW":
-                    case "ArrowUp":
                         this.keys.forward = false;
                         break;
 
                     case "KeyS":
-                    case "ArrowDown":
                         this.keys.backward = false;
                         break;
 
                     case "KeyA":
-                    case "ArrowLeft":
                         this.keys.left = false;
                         break;
 
                     case "KeyD":
-                    case "ArrowRight":
                         this.keys.right = false;
                         break;
 
@@ -254,7 +357,9 @@ export class Player {
             return;
         }
 
-        this.velocityY = this.jumpForce;
+        this.velocityY =
+            this.jumpForce;
+
         this.isGrounded = false;
     }
 
@@ -268,44 +373,67 @@ export class Player {
             return;
         }
 
-        // ----------------------------------------------------
-        // MOVEMENT DIRECTION
-        // ----------------------------------------------------
+        let inputX = 0;
+        let inputZ = 0;
 
-        let moveX = 0;
-        let moveZ = 0;
-
+        // W/S
         if (this.keys.forward) {
-            moveZ -= 1;
+            inputZ -= 1;
         }
 
         if (this.keys.backward) {
-            moveZ += 1;
+            inputZ += 1;
         }
 
+        // A/D
         if (this.keys.left) {
-            moveX -= 1;
+            inputX -= 1;
         }
 
         if (this.keys.right) {
-            moveX += 1;
+            inputX += 1;
         }
 
-        // ----------------------------------------------------
-        // NORMALIZE
-        // ----------------------------------------------------
-
-        const length =
+        const inputLength =
             Math.sqrt(
-                moveX * moveX +
-                moveZ * moveZ
+                inputX * inputX +
+                inputZ * inputZ
             );
 
-        if (length > 0) {
+        if (inputLength > 0) {
 
-            moveX /= length;
-            moveZ /= length;
+            inputX /= inputLength;
+            inputZ /= inputLength;
         }
+
+        // ----------------------------------------------------
+        // CAMERA-RELATIVE MOVEMENT
+        // ----------------------------------------------------
+
+        let moveX = inputX;
+        let moveZ = inputZ;
+
+        const cameraYaw =
+            this.cameraSystem
+                ? this.cameraSystem.yaw
+                : 0;
+
+        const sinYaw =
+            Math.sin(cameraYaw);
+
+        const cosYaw =
+            Math.cos(cameraYaw);
+
+        const rotatedX =
+            moveX * cosYaw -
+            moveZ * sinYaw;
+
+        const rotatedZ =
+            moveX * sinYaw +
+            moveZ * cosYaw;
+
+        moveX = rotatedX;
+        moveZ = rotatedZ;
 
         // ----------------------------------------------------
         // SPEED
@@ -313,7 +441,7 @@ export class Player {
 
         this.isRunning =
             this.keys.run &&
-            length > 0;
+            inputLength > 0;
 
         const speed =
             this.isRunning
@@ -331,10 +459,10 @@ export class Player {
             moveZ * speed * delta;
 
         // ----------------------------------------------------
-        // PLAYER ROTATION
+        // TURN PLAYER TOWARD MOVEMENT
         // ----------------------------------------------------
 
-        if (length > 0) {
+        if (inputLength > 0) {
 
             const targetRotation =
                 Math.atan2(
@@ -342,14 +470,21 @@ export class Player {
                     moveZ
                 );
 
-            this.object.rotation.y =
-                THREE.MathUtils.lerp(
-                    this.object.rotation.y,
-                    targetRotation,
-                    Math.min(
-                        1,
-                        delta * 10
-                    )
+            let difference =
+                targetRotation -
+                this.object.rotation.y;
+
+            difference =
+                Math.atan2(
+                    Math.sin(difference),
+                    Math.cos(difference)
+                );
+
+            this.object.rotation.y +=
+                difference *
+                Math.min(
+                    1,
+                    delta * 10
                 );
         }
 
@@ -364,7 +499,7 @@ export class Player {
             this.velocityY * delta;
 
         // ----------------------------------------------------
-        // TERRAIN COLLISION
+        // TERRAIN
         // ----------------------------------------------------
 
         const terrainHeight =
@@ -373,16 +508,13 @@ export class Player {
                 this.object.position.z
             );
 
-        const groundY =
-            terrainHeight;
-
         if (
             this.object.position.y <=
-            groundY
+            terrainHeight
         ) {
 
             this.object.position.y =
-                groundY;
+                terrainHeight;
 
             this.velocityY = 0;
 
@@ -394,7 +526,7 @@ export class Player {
         }
 
         // ----------------------------------------------------
-        // ISLAND BOUNDARY
+        // ISLAND LIMIT
         // ----------------------------------------------------
 
         const maxDistance = 420;
@@ -403,7 +535,6 @@ export class Player {
             Math.sqrt(
                 this.object.position.x *
                 this.object.position.x +
-
                 this.object.position.z *
                 this.object.position.z
             );
@@ -411,28 +542,30 @@ export class Player {
         if (distance > maxDistance) {
 
             const factor =
-                maxDistance / distance;
+                maxDistance /
+                distance;
 
-            this.object.position.x *= factor;
-            this.object.position.z *= factor;
+            this.object.position.x *=
+                factor;
+
+            this.object.position.z *=
+                factor;
         }
     }
 
     // ========================================================
-    // GET POSITION
+    // POSITION
     // ========================================================
 
     getPosition() {
-
         return this.object.position;
     }
 
     // ========================================================
-    // GET OBJECT
+    // OBJECT
     // ========================================================
 
     getObject() {
-
         return this.object;
     }
 }
