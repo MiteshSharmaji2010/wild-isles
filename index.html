@@ -2,7 +2,6 @@
 <html lang="en">
 
 <head>
-
     <meta charset="UTF-8">
 
     <meta
@@ -26,15 +25,13 @@
         rel="stylesheet"
         href="./public/css/style.css"
     >
-
 </head>
-
 
 <body>
 
-    <!-- =====================================================
+    <!-- =========================================================
          GAME CONTAINER
-         ===================================================== -->
+    ========================================================== -->
 
     <div
         id="game-container"
@@ -42,47 +39,29 @@
     ></div>
 
 
-    <!-- =====================================================
+    <!-- =========================================================
          LOADING SCREEN
-         ===================================================== -->
+    ========================================================== -->
 
-    <div
-        id="loading-screen"
-    >
+    <div id="loading-screen">
 
-        <div
-            class="loading-content"
-        >
+        <div class="loading-content">
 
-            <div
-                class="loading-title"
-            >
+            <div class="loading-title">
                 WILD ISLES
             </div>
 
-
-            <div
-                class="loading-subtitle"
-            >
+            <div class="loading-subtitle">
                 VEYRA ISLAND
             </div>
 
+            <div class="loading-line"></div>
 
-            <div
-                class="loading-line"
-            ></div>
-
-
-            <div
-                class="loading-status"
-            >
+            <div class="loading-status">
                 INITIALIZING WORLD
             </div>
 
-
-            <div
-                class="loading-bar"
-            >
+            <div class="loading-bar">
 
                 <div
                     id="loading-progress"
@@ -90,10 +69,7 @@
 
             </div>
 
-
-            <div
-                id="loading-text"
-            >
+            <div id="loading-text">
                 Preparing Veyra Island...
             </div>
 
@@ -102,41 +78,38 @@
     </div>
 
 
-    <!-- =====================================================
-         BASIC GAME UI
-         Will be expanded later.
-         ===================================================== -->
+    <!-- =========================================================
+         MAIN GAME UI
+    ========================================================== -->
 
     <div
         id="game-ui"
         class="game-ui hidden"
     >
 
-        <!-- TOP LEFT PLAYER STATUS -->
+        <!-- =====================================================
+             PLAYER STATUS
+        ====================================================== -->
 
         <div
             id="player-status"
             class="hud-panel"
         >
 
-            <div
-                class="hud-player-name"
-            >
+            <div class="hud-player-name">
                 KIAN
             </div>
 
 
-            <div
-                class="hud-health"
-            >
+            <!-- HEALTH -->
+
+            <div class="hud-health">
 
                 <span>
                     HEALTH
                 </span>
 
-                <div
-                    class="hud-bar"
-                >
+                <div class="hud-bar">
 
                     <div
                         id="health-fill"
@@ -148,17 +121,15 @@
             </div>
 
 
-            <div
-                class="hud-stamina"
-            >
+            <!-- STAMINA -->
+
+            <div class="hud-stamina">
 
                 <span>
                     STAMINA
                 </span>
 
-                <div
-                    class="hud-bar"
-                >
+                <div class="hud-bar">
 
                     <div
                         id="stamina-fill"
@@ -172,30 +143,29 @@
         </div>
 
 
-        <!-- TOP RIGHT -->
+        <!-- =====================================================
+             WORLD STATUS
+        ====================================================== -->
 
         <div
             id="world-status"
             class="hud-panel world-panel"
         >
 
-            <div
-                id="world-time"
-            >
-                DAY 1
+            <div id="world-time">
+                DAY 1 • 8:00 AM
             </div>
 
-
-            <div
-                id="world-location"
-            >
+            <div id="world-location">
                 VEYRA ISLAND
             </div>
 
         </div>
 
 
-        <!-- CENTER INTERACTION -->
+        <!-- =====================================================
+             INTERACTION MESSAGE
+        ====================================================== -->
 
         <div
             id="interaction-message"
@@ -203,7 +173,9 @@
         ></div>
 
 
-        <!-- CROSSHAIR -->
+        <!-- =====================================================
+             CROSSHAIR
+        ====================================================== -->
 
         <div
             id="crosshair"
@@ -218,7 +190,9 @@
         </div>
 
 
-        <!-- BOTTOM LEFT -->
+        <!-- =====================================================
+             SURVIVAL STATUS
+        ====================================================== -->
 
         <div
             id="survival-status"
@@ -249,35 +223,30 @@
         </div>
 
 
-        <!-- BOTTOM CENTER -->
+        <!-- =====================================================
+             CONTROLS HINT
+        ====================================================== -->
 
         <div
             id="controls-hint"
             class="controls-hint"
         >
 
-            <span>
-                W A S D
-            </span>
-
+            <span>W A S D</span>
             MOVE
 
-            <span>
-                SHIFT
-            </span>
-
+            <span>SHIFT</span>
             RUN
 
-            <span>
-                SPACE
-            </span>
-
+            <span>SPACE</span>
             JUMP
 
         </div>
 
 
-        <!-- DEBUG -->
+        <!-- =====================================================
+             DEBUG INFORMATION
+        ====================================================== -->
 
         <div
             id="debug-info"
@@ -287,14 +256,18 @@
     </div>
 
 
-    <!-- =====================================================
-         MOBILE HUD
-         ===================================================== -->
+    <!-- =========================================================
+         MOBILE UI
+    ========================================================== -->
 
     <div
         id="mobile-ui"
         class="mobile-ui hidden"
     >
+
+        <!-- =====================================================
+             JOYSTICK
+        ====================================================== -->
 
         <div
             id="mobile-joystick"
@@ -308,9 +281,11 @@
         </div>
 
 
-        <div
-            class="mobile-actions"
-        >
+        <!-- =====================================================
+             MOBILE ACTION BUTTONS
+        ====================================================== -->
+
+        <div class="mobile-actions">
 
             <button
                 id="mobile-run"
@@ -320,7 +295,6 @@
                 RUN
             </button>
 
-
             <button
                 id="mobile-jump"
                 class="mobile-button"
@@ -328,7 +302,6 @@
             >
                 JUMP
             </button>
-
 
             <button
                 id="mobile-action"
@@ -343,9 +316,9 @@
     </div>
 
 
-    <!-- =====================================================
-         GAME SCRIPT
-         ===================================================== -->
+    <!-- =========================================================
+         GAME ENTRY
+    ========================================================== -->
 
     <script
         type="module"
