@@ -1,12 +1,11 @@
 // ============================================================
 // WILD ISLES
-// public/js/player.js
-// KIAN PLAYER CONTROLLER v0.9
+// PLAYER SYSTEM
+// KIAN - HUGE WORLD MOVEMENT
+// Version 1.0
 // ============================================================
 
-import * as THREE from
-    "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
-
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
 
 export class Player {
 
@@ -16,7 +15,13 @@ export class Player {
         this.terrain = terrain;
 
         // ====================================================
-        // PLAYER SETTINGS
+        // PLAYER IDENTITY
+        // ====================================================
+
+        this.name = "KIAN";
+
+        // ====================================================
+        // PLAYER PHYSICS
         // ====================================================
 
         this.height = 3.1;
@@ -30,10 +35,18 @@ export class Player {
 
         this.maxSlope = 38;
 
-        this.worldLimit = 410;
+        // ====================================================
+        // HUGE WORLD
+        // ====================================================
+
+        this.worldLimit =
+            terrain &&
+            Number.isFinite(terrain.worldHalfSize)
+                ? terrain.worldHalfSize - 5
+                : 8180;
 
         // ====================================================
-        // PLAYER STATS
+        // PLAYER STATE
         // ====================================================
 
         this.health = 100;
@@ -42,22 +55,17 @@ export class Player {
         this.stamina = 100;
         this.maxStamina = 100;
 
-        this.staminaDrain = 22;
-        this.staminaRecovery = 16;
-
-        // ====================================================
-        // MOVEMENT
-        // ====================================================
-
-        this.velocity = new THREE.Vector3();
-
-        this.moveDirection = new THREE.Vector3();
-
-        this.cameraRotation = 0;
-
-        this.isGrounded = false;
         this.isRunning = false;
         this.isCrouching = false;
+        this.isGrounded = false;
+        this.isJumping = false;
+
+        this.velocity =
+            new THREE.Vector3(
+                0,
+                0,
+                0
+            );
 
         // ====================================================
         // INPUT
@@ -65,19 +73,49 @@ export class Player {
 
         this.keys = {};
 
-        this.setupKeyboard();
+        this.cameraRotation = Math.PI;
+
+        // ====================================================
+        // MOVEMENT SETTINGS
+        // ====================================================
+
+        this.staminaDrain = 18;
+
+        this.staminaRecovery = 14;
+
+        this.crouchSpeedMultiplier = 0.48;
+
+        this.airControl = 0.65;
+
+        // ====================================================
+        // ANIMATION
+        // ====================================================
+
+        this.animationTime = 0;
+
+        this.currentAnimation = "idle";
 
         // ====================================================
         // PLAYER OBJECT
         // ====================================================
 
-        this.object = new THREE.Group();
+        this.object =
+            new THREE.Group();
 
-        this.object.name = "KIAN";
+        this.object.name =
+            "KIAN_PLAYER";
 
         this.createPlayerModel();
 
-        this.scene.add(this.object);
+        this.scene.add(
+            this.object
+        );
+
+        // ====================================================
+        // KEYBOARD
+        // ====================================================
+
+        this.setupKeyboard();
 
         // ====================================================
         // SPAWN
@@ -85,9 +123,445 @@ export class Player {
 
         this.spawnPlayer();
 
-        console.log("Kian Player v0.9 READY");
+        console.log(
+            "KIAN Player v1.0 HUGE WORLD READY"
+        );
     }
 
+    // ========================================================
+    // CREATE PLAYER MODEL
+    // ========================================================
+
+    createPlayerModel() {
+
+        this.bodyGroup =
+            new THREE.Group();
+
+        this.bodyGroup.name =
+            "KIAN_BODY";
+
+        // ----------------------------------------------------
+        // MATERIALS
+        // ----------------------------------------------------
+
+        const skinMaterial =
+            new THREE.MeshStandardMaterial({
+
+                color: 0xc58d6d,
+
+                roughness: 0.82,
+
+                metalness: 0.02
+
+            });
+
+        const shirtMaterial =
+            new THREE.MeshStandardMaterial({
+
+                color: 0x28343d,
+
+                roughness: 0.85,
+
+                metalness: 0.05
+
+            });
+
+        const pantsMaterial =
+            new THREE.MeshStandardMaterial({
+
+                color: 0x171b20,
+
+                roughness: 0.9,
+
+                metalness: 0.02
+
+            });
+
+        const bootMaterial =
+            new THREE.MeshStandardMaterial({
+
+                color: 0x090b0d,
+
+                roughness: 0.9,
+
+                metalness: 0.08
+
+            });
+
+        const gearMaterial =
+            new THREE.MeshStandardMaterial({
+
+                color: 0x38454b,
+
+                roughness: 0.75,
+
+                metalness: 0.18
+
+            });
+
+        // ----------------------------------------------------
+        // BODY
+        // ----------------------------------------------------
+
+        const bodyGeometry =
+            new THREE.BoxGeometry(
+                1.05,
+                1.35,
+                0.58
+            );
+
+        this.body =
+            new THREE.Mesh(
+                bodyGeometry,
+                shirtMaterial
+            );
+
+        this.body.position.y =
+            1.85;
+
+        this.body.castShadow = true;
+
+        this.body.receiveShadow = true;
+
+        this.bodyGroup.add(
+            this.body
+        );
+
+        // ----------------------------------------------------
+        // HEAD
+        // ----------------------------------------------------
+
+        const headGeometry =
+            new THREE.SphereGeometry(
+                0.43,
+                20,
+                16
+            );
+
+        this.head =
+            new THREE.Mesh(
+                headGeometry,
+                skinMaterial
+            );
+
+        this.head.position.y =
+            2.85;
+
+        this.head.castShadow = true;
+
+        this.bodyGroup.add(
+            this.head
+        );
+
+        // ----------------------------------------------------
+        // HAIR
+        // ----------------------------------------------------
+
+        const hairGeometry =
+            new THREE.SphereGeometry(
+                0.45,
+                18,
+                12,
+                0,
+                Math.PI * 2,
+                0,
+                Math.PI * 0.48
+            );
+
+        const hairMaterial =
+            new THREE.MeshStandardMaterial({
+
+                color: 0x151313,
+
+                roughness: 0.9
+
+            });
+
+        this.hair =
+            new THREE.Mesh(
+                hairGeometry,
+                hairMaterial
+            );
+
+        this.hair.position.y =
+            3.02;
+
+        this.hair.scale.set(
+            1,
+            0.8,
+            1
+        );
+
+        this.hair.castShadow = true;
+
+        this.bodyGroup.add(
+            this.hair
+        );
+
+        // ----------------------------------------------------
+        // LEFT ARM
+        // ----------------------------------------------------
+
+        const armGeometry =
+            new THREE.BoxGeometry(
+                0.32,
+                1.15,
+                0.34
+            );
+
+        this.leftArm =
+            new THREE.Mesh(
+                armGeometry,
+                shirtMaterial
+            );
+
+        this.leftArm.position.set(
+            -0.68,
+            1.9,
+            0
+        );
+
+        this.leftArm.rotation.z =
+            -0.08;
+
+        this.leftArm.castShadow = true;
+
+        this.bodyGroup.add(
+            this.leftArm
+        );
+
+        // ----------------------------------------------------
+        // RIGHT ARM
+        // ----------------------------------------------------
+
+        this.rightArm =
+            new THREE.Mesh(
+                armGeometry,
+                shirtMaterial
+            );
+
+        this.rightArm.position.set(
+            0.68,
+            1.9,
+            0
+        );
+
+        this.rightArm.rotation.z =
+            0.08;
+
+        this.rightArm.castShadow = true;
+
+        this.bodyGroup.add(
+            this.rightArm
+        );
+
+        // ----------------------------------------------------
+        // LEFT LEG
+        // ----------------------------------------------------
+
+        const legGeometry =
+            new THREE.BoxGeometry(
+                0.38,
+                1.15,
+                0.42
+            );
+
+        this.leftLeg =
+            new THREE.Mesh(
+                legGeometry,
+                pantsMaterial
+            );
+
+        this.leftLeg.position.set(
+            -0.25,
+            0.65,
+            0
+        );
+
+        this.leftLeg.castShadow = true;
+
+        this.bodyGroup.add(
+            this.leftLeg
+        );
+
+        // ----------------------------------------------------
+        // RIGHT LEG
+        // ----------------------------------------------------
+
+        this.rightLeg =
+            new THREE.Mesh(
+                legGeometry,
+                pantsMaterial
+            );
+
+        this.rightLeg.position.set(
+            0.25,
+            0.65,
+            0
+        );
+
+        this.rightLeg.castShadow = true;
+
+        this.bodyGroup.add(
+            this.rightLeg
+        );
+
+        // ----------------------------------------------------
+        // LEFT BOOT
+        // ----------------------------------------------------
+
+        const bootGeometry =
+            new THREE.BoxGeometry(
+                0.44,
+                0.25,
+                0.62
+            );
+
+        this.leftBoot =
+            new THREE.Mesh(
+                bootGeometry,
+                bootMaterial
+            );
+
+        this.leftBoot.position.set(
+            -0.25,
+            0.08,
+            -0.08
+        );
+
+        this.leftBoot.castShadow = true;
+
+        this.bodyGroup.add(
+            this.leftBoot
+        );
+
+        // ----------------------------------------------------
+        // RIGHT BOOT
+        // ----------------------------------------------------
+
+        this.rightBoot =
+            new THREE.Mesh(
+                bootGeometry,
+                bootMaterial
+            );
+
+        this.rightBoot.position.set(
+            0.25,
+            0.08,
+            -0.08
+        );
+
+        this.rightBoot.castShadow = true;
+
+        this.bodyGroup.add(
+            this.rightBoot
+        );
+
+        // ----------------------------------------------------
+        // BACKPACK
+        // ----------------------------------------------------
+
+        const backpackGeometry =
+            new THREE.BoxGeometry(
+                0.72,
+                0.9,
+                0.25
+            );
+
+        this.backpack =
+            new THREE.Mesh(
+                backpackGeometry,
+                gearMaterial
+            );
+
+        this.backpack.position.set(
+            0,
+            1.95,
+            0.39
+        );
+
+        this.backpack.castShadow = true;
+
+        this.bodyGroup.add(
+            this.backpack
+        );
+
+        // ----------------------------------------------------
+        // CHEST STRAP
+        // ----------------------------------------------------
+
+        const strapGeometry =
+            new THREE.BoxGeometry(
+                0.12,
+                1.2,
+                0.08
+            );
+
+        const strap =
+            new THREE.Mesh(
+                strapGeometry,
+                gearMaterial
+            );
+
+        strap.position.set(
+            0.32,
+            1.95,
+            -0.31
+        );
+
+        strap.rotation.z =
+            -0.12;
+
+        this.bodyGroup.add(
+            strap
+        );
+
+        // ----------------------------------------------------
+        // FLASHLIGHT
+        // ----------------------------------------------------
+
+        const flashlightGeometry =
+            new THREE.CylinderGeometry(
+                0.07,
+                0.09,
+                0.38,
+                10
+            );
+
+        this.flashlight =
+            new THREE.Mesh(
+                flashlightGeometry,
+                gearMaterial
+            );
+
+        this.flashlight.rotation.z =
+            Math.PI / 2;
+
+        this.flashlight.position.set(
+            0.73,
+            1.62,
+            -0.08
+        );
+
+        this.bodyGroup.add(
+            this.flashlight
+        );
+
+        // ----------------------------------------------------
+        // BODY SCALE
+        // ----------------------------------------------------
+
+        this.bodyGroup.scale.set(
+            1.25,
+            1.25,
+            1.25
+        );
+
+        this.object.add(
+            this.bodyGroup
+        );
+
+    }
 
     // ========================================================
     // KEYBOARD
@@ -101,453 +575,106 @@ export class Player {
 
                 this.keys[event.code] = true;
 
+                // Prevent page scrolling
                 if (
-                    event.code === "Space" &&
-                    !event.repeat
+                    event.code === "Space" ||
+                    event.code === "ArrowUp" ||
+                    event.code === "ArrowDown" ||
+                    event.code === "ArrowLeft" ||
+                    event.code === "ArrowRight"
+                ) {
+
+                    event.preventDefault();
+
+                }
+
+                if (
+                    event.code === "Space"
                 ) {
 
                     this.jump();
+
                 }
 
                 if (
-                    event.code === "ShiftLeft" ||
-                    event.code === "ShiftRight"
+                    event.code === "ControlLeft" ||
+                    event.code === "ControlRight"
                 ) {
 
-                    this.isRunning = true;
+                    this.isCrouching =
+                        true;
+
                 }
+
             }
         );
-
 
         window.addEventListener(
             "keyup",
             (event) => {
 
-                this.keys[event.code] = false;
+                this.keys[event.code] =
+                    false;
 
                 if (
-                    event.code === "ShiftLeft" ||
-                    event.code === "ShiftRight"
+                    event.code === "ControlLeft" ||
+                    event.code === "ControlRight"
                 ) {
 
-                    this.isRunning = false;
+                    this.isCrouching =
+                        false;
+
                 }
+
             }
         );
+
+        window.addEventListener(
+            "blur",
+            () => {
+
+                this.keys = {};
+
+                this.isRunning = false;
+
+            }
+        );
+
     }
 
-
     // ========================================================
-    // PLAYER MODEL
+    // CAMERA ROTATION
     // ========================================================
 
-    createPlayerModel() {
+    setCameraRotation(
+        rotation
+    ) {
 
-        const root = new THREE.Group();
+        if (
+            !Number.isFinite(rotation)
+        ) {
 
-        root.scale.set(
-            1.25,
-            1.25,
-            1.25
-        );
+            return;
 
+        }
 
-        // ====================================================
-        // MATERIALS
-        // ====================================================
+        this.cameraRotation =
+            rotation;
 
-        const skinMaterial =
-            new THREE.MeshStandardMaterial({
-                color: 0xc58b68,
-                roughness: 0.8
-            });
-
-
-        const hairMaterial =
-            new THREE.MeshStandardMaterial({
-                color: 0x17120f,
-                roughness: 0.9
-            });
-
-
-        const shirtMaterial =
-            new THREE.MeshStandardMaterial({
-                color: 0x26352f,
-                roughness: 0.85
-            });
-
-
-        const pantsMaterial =
-            new THREE.MeshStandardMaterial({
-                color: 0x20252a,
-                roughness: 0.9
-            });
-
-
-        const bootMaterial =
-            new THREE.MeshStandardMaterial({
-                color: 0x161616,
-                roughness: 0.95
-            });
-
-
-        const backpackMaterial =
-            new THREE.MeshStandardMaterial({
-                color: 0x3c463d,
-                roughness: 0.9
-            });
-
-
-        // ====================================================
-        // HEAD
-        // ====================================================
-
-        const headGeometry =
-            new THREE.SphereGeometry(
-                0.38,
-                16,
-                12
-            );
-
-        const head =
-            new THREE.Mesh(
-                headGeometry,
-                skinMaterial
-            );
-
-        head.position.y = 2.65;
-
-        head.castShadow = true;
-
-        root.add(head);
-
-
-        // ====================================================
-        // HAIR
-        // ====================================================
-
-        const hairGeometry =
-            new THREE.SphereGeometry(
-                0.40,
-                16,
-                8,
-                0,
-                Math.PI * 2,
-                0,
-                Math.PI * 0.48
-            );
-
-        const hair =
-            new THREE.Mesh(
-                hairGeometry,
-                hairMaterial
-            );
-
-        hair.position.y = 2.80;
-
-        hair.castShadow = true;
-
-        root.add(hair);
-
-
-        // ====================================================
-        // BODY
-        // ====================================================
-
-        const bodyGeometry =
-            new THREE.BoxGeometry(
-                0.85,
-                1.15,
-                0.48
-            );
-
-        const body =
-            new THREE.Mesh(
-                bodyGeometry,
-                shirtMaterial
-            );
-
-        body.position.y = 1.75;
-
-        body.castShadow = true;
-
-        root.add(body);
-
-
-        // ====================================================
-        // LEFT ARM
-        // ====================================================
-
-        const armGeometry =
-            new THREE.BoxGeometry(
-                0.25,
-                0.95,
-                0.25
-            );
-
-
-        const leftArm =
-            new THREE.Mesh(
-                armGeometry,
-                shirtMaterial
-            );
-
-        leftArm.position.set(
-            -0.58,
-            1.78,
-            0
-        );
-
-        leftArm.rotation.z = -0.08;
-
-        leftArm.castShadow = true;
-
-        root.add(leftArm);
-
-
-        // ====================================================
-        // RIGHT ARM
-        // ====================================================
-
-        const rightArm =
-            new THREE.Mesh(
-                armGeometry,
-                shirtMaterial
-            );
-
-        rightArm.position.set(
-            0.58,
-            1.78,
-            0
-        );
-
-        rightArm.rotation.z = 0.08;
-
-        rightArm.castShadow = true;
-
-        root.add(rightArm);
-
-
-        // ====================================================
-        // HANDS
-        // ====================================================
-
-        const handGeometry =
-            new THREE.SphereGeometry(
-                0.14,
-                10,
-                8
-            );
-
-
-        const leftHand =
-            new THREE.Mesh(
-                handGeometry,
-                skinMaterial
-            );
-
-        leftHand.position.set(
-            -0.62,
-            1.25,
-            0
-        );
-
-        leftHand.castShadow = true;
-
-        root.add(leftHand);
-
-
-        const rightHand =
-            new THREE.Mesh(
-                handGeometry,
-                skinMaterial
-            );
-
-        rightHand.position.set(
-            0.62,
-            1.25,
-            0
-        );
-
-        rightHand.castShadow = true;
-
-        root.add(rightHand);
-
-
-        // ====================================================
-        // LEGS
-        // ====================================================
-
-        const legGeometry =
-            new THREE.BoxGeometry(
-                0.30,
-                1.05,
-                0.32
-            );
-
-
-        const leftLeg =
-            new THREE.Mesh(
-                legGeometry,
-                pantsMaterial
-            );
-
-        leftLeg.position.set(
-            -0.22,
-            0.85,
-            0
-        );
-
-        leftLeg.castShadow = true;
-
-        root.add(leftLeg);
-
-
-        const rightLeg =
-            new THREE.Mesh(
-                legGeometry,
-                pantsMaterial
-            );
-
-        rightLeg.position.set(
-            0.22,
-            0.85,
-            0
-        );
-
-        rightLeg.castShadow = true;
-
-        root.add(rightLeg);
-
-
-        // ====================================================
-        // BOOTS
-        // ====================================================
-
-        const bootGeometry =
-            new THREE.BoxGeometry(
-                0.36,
-                0.25,
-                0.55
-            );
-
-
-        const leftBoot =
-            new THREE.Mesh(
-                bootGeometry,
-                bootMaterial
-            );
-
-        leftBoot.position.set(
-            -0.22,
-            0.28,
-            0.08
-        );
-
-        leftBoot.castShadow = true;
-
-        root.add(leftBoot);
-
-
-        const rightBoot =
-            new THREE.Mesh(
-                bootGeometry,
-                bootMaterial
-            );
-
-        rightBoot.position.set(
-            0.22,
-            0.28,
-            0.08
-        );
-
-        rightBoot.castShadow = true;
-
-        root.add(rightBoot);
-
-
-        // ====================================================
-        // BACKPACK
-        // ====================================================
-
-        const backpackGeometry =
-            new THREE.BoxGeometry(
-                0.65,
-                0.85,
-                0.28
-            );
-
-        const backpack =
-            new THREE.Mesh(
-                backpackGeometry,
-                backpackMaterial
-            );
-
-        backpack.position.set(
-            0,
-            1.75,
-            -0.38
-        );
-
-        backpack.castShadow = true;
-
-        root.add(backpack);
-
-
-        // ====================================================
-        // PLAYER SHADOW
-        // ====================================================
-
-        const shadowGeometry =
-            new THREE.CircleGeometry(
-                0.75,
-                20
-            );
-
-        const shadowMaterial =
-            new THREE.MeshBasicMaterial({
-                color: 0x000000,
-                transparent: true,
-                opacity: 0.28,
-                depthWrite: false
-            });
-
-        this.shadow =
-            new THREE.Mesh(
-                shadowGeometry,
-                shadowMaterial
-            );
-
-        this.shadow.rotation.x =
-            -Math.PI / 2;
-
-        this.shadow.position.y =
-            0.03;
-
-        this.object.add(
-            this.shadow
-        );
-
-
-        this.model = root;
-
-        this.object.add(root);
     }
 
-
     // ========================================================
-    // SPAWN
+    // SPAWN PLAYER
     // ========================================================
 
     spawnPlayer() {
 
-        let spawn = null;
+        let spawn;
 
         if (
             this.terrain &&
             typeof this.terrain.findSafePosition ===
-            "function"
+                "function"
         ) {
 
             spawn =
@@ -556,18 +683,20 @@ export class Player {
                     0,
                     150
                 );
-        }
 
-
-        if (!spawn) {
+        } else {
 
             spawn = {
-                x: 0,
-                y: 10,
-                z: 0
-            };
-        }
 
+                x: 0,
+
+                y: 5,
+
+                z: 0
+
+            };
+
+        }
 
         this.object.position.set(
             spawn.x,
@@ -575,76 +704,117 @@ export class Player {
             spawn.z
         );
 
+        this.velocity.set(
+            0,
+            0,
+            0
+        );
 
-        const ground =
-            this.getGroundHeight(
-                spawn.x,
-                spawn.z
-            );
+        this.isGrounded =
+            true;
 
+        this.isJumping =
+            false;
 
-        if (Number.isFinite(ground)) {
+        console.log(
+            "KIAN SPAWN:",
+            this.object.position
+        );
 
-            this.object.position.y =
-                ground;
-        }
     }
-
-
-    // ========================================================
-    // CAMERA ROTATION
-    // ========================================================
-
-    setCameraRotation(rotation) {
-
-        this.cameraRotation =
-            rotation || 0;
-    }
-
 
     // ========================================================
     // GROUND HEIGHT
     // ========================================================
 
-    getGroundHeight(x, z) {
+    getGroundHeight(
+        x,
+        z
+    ) {
 
         if (
-            this.terrain &&
+            !this.terrain
+        ) {
+
+            return 0;
+
+        }
+
+        if (
             typeof this.terrain.getGroundHeight ===
             "function"
         ) {
 
-            const height =
-                this.terrain.getGroundHeight(
-                    x,
-                    z
-                );
+            return this.terrain.getGroundHeight(
+                x,
+                z
+            );
 
-            if (Number.isFinite(height)) {
-                return height;
-            }
         }
-
-        return this.object.position.y;
-    }
-
-
-    // ========================================================
-    // SAFE POSITION
-    // ========================================================
-
-    isSafePosition(x, z) {
 
         if (
-            Math.abs(x) >
-            this.worldLimit ||
-            Math.abs(z) >
-            this.worldLimit
+            typeof this.terrain.getHeight ===
+            "function"
         ) {
 
-            return false;
+            return this.terrain.getHeight(
+                x,
+                z
+            );
+
         }
 
+        return 0;
+
+    }
+
+    // ========================================================
+    // SAFE POSITION CHECK
+    // ========================================================
+
+    isSafePosition(
+        x,
+        z
+    ) {
+
+        if (
+            !this.terrain
+        ) {
+
+            return true;
+
+        }
+
+        if (
+            typeof this.terrain.isInsideWorld ===
+            "function"
+        ) {
+
+            if (
+                !this.terrain.isInsideWorld(
+                    x,
+                    z
+                )
+            ) {
+
+                return false;
+
+            }
+
+        } else {
+
+            if (
+                Math.abs(x) >
+                this.worldLimit ||
+                Math.abs(z) >
+                this.worldLimit
+            ) {
+
+                return false;
+
+            }
+
+        }
 
         const ground =
             this.getGroundHeight(
@@ -652,140 +822,168 @@ export class Player {
                 z
             );
 
-
-        if (!Number.isFinite(ground)) {
-            return false;
-        }
-
-
         // Water protection
+        if (
+            ground <=
+            (
+                Number.isFinite(
+                    this.terrain.waterLevel
+                )
+                    ? this.terrain.waterLevel + 0.35
+                    : 2.15
+            )
+        ) {
 
-        if (ground <= 1.8) {
             return false;
+
         }
 
-
+        // Slope protection
         if (
-            this.terrain &&
-            typeof this.terrain.isWalkable ===
+            typeof this.terrain.getSlopeDegrees ===
             "function"
         ) {
 
-            if (
-                !this.terrain.isWalkable(
+            const slope =
+                this.terrain.getSlopeDegrees(
                     x,
                     z
-                )
+                );
+
+            if (
+                slope >
+                this.maxSlope
             ) {
 
                 return false;
+
             }
+
         }
 
-
         return true;
-    }
 
+    }
 
     // ========================================================
     // MOVEMENT
     // ========================================================
 
     tryMove(
-        directionX,
-        directionZ,
-        distance
+        deltaX,
+        deltaZ
     ) {
 
+        const currentX =
+            this.object.position.x;
+
+        const currentZ =
+            this.object.position.z;
+
+        const targetX =
+            currentX +
+            deltaX;
+
+        const targetZ =
+            currentZ +
+            deltaZ;
+
+        // ----------------------------------------------------
+        // HUGE WORLD BOUNDARY
+        // ----------------------------------------------------
+
         if (
-            Math.abs(directionX) < 0.0001 &&
-            Math.abs(directionZ) < 0.0001
+            this.terrain &&
+            typeof this.terrain.isInsideWorld ===
+            "function"
         ) {
 
-            return;
+            if (
+                !this.terrain.isInsideWorld(
+                    targetX,
+                    targetZ
+                )
+            ) {
+
+                return false;
+
+            }
+
+        } else {
+
+            if (
+                Math.abs(targetX) >
+                this.worldLimit ||
+                Math.abs(targetZ) >
+                this.worldLimit
+            ) {
+
+                return false;
+
+            }
+
         }
 
-
-        const length =
-            Math.sqrt(
-                directionX * directionX +
-                directionZ * directionZ
-            );
-
-
-        directionX /= length;
-        directionZ /= length;
-
-
-        const nextX =
-            this.object.position.x +
-            directionX * distance;
-
-
-        const nextZ =
-            this.object.position.z +
-            directionZ * distance;
-
+        // ----------------------------------------------------
+        // FULL MOVEMENT
+        // ----------------------------------------------------
 
         if (
-            !this.isSafePosition(
-                nextX,
-                nextZ
+            this.isSafePosition(
+                targetX,
+                targetZ
             )
         ) {
 
-            return;
-        }
-
-
-        const ground =
-            this.getGroundHeight(
-                nextX,
-                nextZ
-            );
-
-
-        if (
-            Number.isFinite(ground)
-        ) {
-
-            const currentGround =
-                this.getGroundHeight(
-                    this.object.position.x,
-                    this.object.position.z
-                );
-
-
-            const heightDifference =
-                ground - currentGround;
-
-
-            // Prevent very steep sudden movement
-
-            if (
-                Math.abs(heightDifference) >
-                1.5
-            ) {
-
-                return;
-            }
-
-
             this.object.position.x =
-                nextX;
+                targetX;
 
             this.object.position.z =
-                nextZ;
+                targetZ;
 
+            return true;
 
-            if (this.isGrounded) {
-
-                this.object.position.y =
-                    ground;
-            }
         }
-    }
 
+        // ----------------------------------------------------
+        // X SLIDE
+        // ----------------------------------------------------
+
+        if (
+            this.isSafePosition(
+                targetX,
+                currentZ
+            )
+        ) {
+
+            this.object.position.x =
+                targetX;
+
+            return true;
+
+        }
+
+        // ----------------------------------------------------
+        // Z SLIDE
+        // ----------------------------------------------------
+
+        if (
+            this.isSafePosition(
+                currentX,
+                targetZ
+            )
+        ) {
+
+            this.object.position.z =
+                targetZ;
+
+            return true;
+
+        }
+
+        return false;
+
+    }
 
     // ========================================================
     // JUMP
@@ -793,243 +991,92 @@ export class Player {
 
     jump() {
 
-        if (!this.isGrounded) {
-            return;
+        if (
+            !this.isGrounded
+        ) {
+
+            return false;
+
         }
 
+        if (
+            this.stamina < 8
+        ) {
 
-        if (this.stamina < 8) {
-            return;
+            return false;
+
         }
-
 
         this.velocity.y =
             this.jumpForce;
 
-
         this.isGrounded =
             false;
 
+        this.isJumping =
+            true;
 
-        this.stamina -= 8;
+        this.stamina =
+            Math.max(
+                0,
+                this.stamina - 8
+            );
+
+        return true;
+
     }
 
+    // ========================================================
+    // CROUCH
+    // ========================================================
+
+    updateCrouch() {
+
+        const crouchPressed =
+            this.keys["ControlLeft"] ||
+            this.keys["ControlRight"];
+
+        this.isCrouching =
+            !!crouchPressed;
+
+        const targetScaleY =
+            this.isCrouching
+                ? 0.78
+                : 1;
+
+        this.bodyGroup.scale.y +=
+            (
+                targetScaleY -
+                this.bodyGroup.scale.y
+            ) *
+            0.18;
+
+    }
 
     // ========================================================
-    // UPDATE
+    // RUNNING
     // ========================================================
 
-    update(
-        deltaTime,
-        cameraRotation = 0
+    updateRunning(
+        deltaTime
     ) {
 
-        if (!Number.isFinite(deltaTime)) {
-            deltaTime = 0.016;
-        }
-
-
-        deltaTime =
-            Math.min(
-                deltaTime,
-                0.05
-            );
-
-
-        this.cameraRotation =
-            cameraRotation;
-
-
-        // ====================================================
-        // INPUT
-        // ====================================================
-
-        let inputX = 0;
-        let inputZ = 0;
-
-
-        // W = FORWARD
-
-        if (
-            this.keys["KeyW"] ||
-            this.keys["ArrowUp"]
-        ) {
-
-            inputZ -= 1;
-        }
-
-
-        // S = BACKWARD
-
-        if (
-            this.keys["KeyS"] ||
-            this.keys["ArrowDown"]
-        ) {
-
-            inputZ += 1;
-        }
-
-
-        // A = LEFT
-
-        if (
-            this.keys["KeyA"] ||
-            this.keys["ArrowLeft"]
-        ) {
-
-            inputX -= 1;
-        }
-
-
-        // D = RIGHT
-
-        if (
-            this.keys["KeyD"] ||
-            this.keys["ArrowRight"]
-        ) {
-
-            inputX += 1;
-        }
-
-
-        const inputLength =
-            Math.sqrt(
-                inputX * inputX +
-                inputZ * inputZ
-            );
-
+        const wantsRun =
+            this.keys["ShiftLeft"] ||
+            this.keys["ShiftRight"];
 
         const moving =
-            inputLength > 0;
+            this.isMoving();
 
-
-        if (moving) {
-
-            inputX /= inputLength;
-            inputZ /= inputLength;
-        }
-
-
-        // ====================================================
-        // RUN
-        // ====================================================
-
-        const wantsRun =
-            (
-                this.keys["ShiftLeft"] ||
-                this.keys["ShiftRight"]
-            ) &&
+        if (
+            wantsRun &&
             moving &&
-            this.stamina > 1 &&
-            !this.isCrouching;
+            !this.isCrouching &&
+            this.stamina > 1
+        ) {
 
-
-        this.isRunning =
-            wantsRun;
-
-
-        let speed =
-            this.isRunning
-                ? this.runSpeed
-                : this.walkSpeed;
-
-
-        if (this.isCrouching) {
-            speed *= 0.5;
-        }
-
-
-        // ====================================================
-        // CAMERA-RELATIVE MOVEMENT
-        // ====================================================
-
-        if (moving) {
-
-            const sin =
-                Math.sin(
-                    this.cameraRotation
-                );
-
-            const cos =
-                Math.cos(
-                    this.cameraRotation
-                );
-
-
-            // Forward vector relative to camera
-
-            const worldX =
-                inputX * cos -
-                inputZ * sin;
-
-
-            const worldZ =
-                inputX * sin +
-                inputZ * cos;
-
-
-            this.moveDirection.set(
-                worldX,
-                0,
-                worldZ
-            );
-
-
-            this.tryMove(
-                worldX,
-                worldZ,
-                speed * deltaTime
-            );
-
-
-            // Character faces movement direction
-
-            const targetRotation =
-                Math.atan2(
-                    worldX,
-                    worldZ
-                );
-
-
-            let rotationDifference =
-                targetRotation -
-                this.object.rotation.y;
-
-
-            while (
-                rotationDifference >
-                Math.PI
-            ) {
-
-                rotationDifference -=
-                    Math.PI * 2;
-            }
-
-
-            while (
-                rotationDifference <
-                -Math.PI
-            ) {
-
-                rotationDifference +=
-                    Math.PI * 2;
-            }
-
-
-            this.object.rotation.y +=
-                rotationDifference *
-                Math.min(
-                    1,
-                    deltaTime * 10
-                );
-        }
-
-
-        // ====================================================
-        // STAMINA
-        // ====================================================
-
-        if (this.isRunning) {
+            this.isRunning =
+                true;
 
             this.stamina -=
                 this.staminaDrain *
@@ -1037,11 +1084,21 @@ export class Player {
 
         } else {
 
-            this.stamina +=
-                this.staminaRecovery *
-                deltaTime;
-        }
+            this.isRunning =
+                false;
 
+            if (
+                !moving ||
+                !wantsRun
+            ) {
+
+                this.stamina +=
+                    this.staminaRecovery *
+                    deltaTime;
+
+            }
+
+        }
 
         this.stamina =
             THREE.MathUtils.clamp(
@@ -1050,121 +1107,378 @@ export class Player {
                 this.maxStamina
             );
 
+    }
 
-        // ====================================================
+    // ========================================================
+    // MOVEMENT INPUT
+    // ========================================================
+
+    getMovementInput() {
+
+        let inputX = 0;
+
+        let inputZ = 0;
+
+        // ----------------------------------------------------
+        // KEEP EXISTING CONTROLS
+        // ----------------------------------------------------
+
+        if (
+            this.keys["KeyW"] ||
+            this.keys["ArrowUp"]
+        ) {
+
+            inputZ -= 1;
+
+        }
+
+        if (
+            this.keys["KeyS"] ||
+            this.keys["ArrowDown"]
+        ) {
+
+            inputZ += 1;
+
+        }
+
+        if (
+            this.keys["KeyA"] ||
+            this.keys["ArrowLeft"]
+        ) {
+
+            inputX -= 1;
+
+        }
+
+        if (
+            this.keys["KeyD"] ||
+            this.keys["ArrowRight"]
+        ) {
+
+            inputX += 1;
+
+        }
+
+        const length =
+            Math.hypot(
+                inputX,
+                inputZ
+            );
+
+        if (
+            length > 0
+        ) {
+
+            inputX /=
+                length;
+
+            inputZ /=
+                length;
+
+        }
+
+        return {
+
+            x: inputX,
+
+            z: inputZ,
+
+            moving:
+                length > 0
+
+        };
+
+    }
+
+    // ========================================================
+    // CAMERA RELATIVE MOVEMENT
+    // ========================================================
+
+    getWorldMovement(
+        inputX,
+        inputZ
+    ) {
+
+        const sin =
+            Math.sin(
+                this.cameraRotation
+            );
+
+        const cos =
+            Math.cos(
+                this.cameraRotation
+            );
+
+        const worldX =
+            inputX * cos -
+            inputZ * sin;
+
+        const worldZ =
+            inputX * sin +
+            inputZ * cos;
+
+        return {
+
+            x: worldX,
+
+            z: worldZ
+
+        };
+
+    }
+
+    // ========================================================
+    // IS MOVING
+    // ========================================================
+
+    isMoving() {
+
+        return (
+            this.keys["KeyW"] ||
+            this.keys["KeyS"] ||
+            this.keys["KeyA"] ||
+            this.keys["KeyD"] ||
+            this.keys["ArrowUp"] ||
+            this.keys["ArrowDown"] ||
+            this.keys["ArrowLeft"] ||
+            this.keys["ArrowRight"]
+        );
+
+    }
+
+    // ========================================================
+    // MAIN UPDATE
+    // ========================================================
+
+    update(
+        deltaTime,
+        cameraYaw = this.cameraRotation
+    ) {
+
+        if (
+            !Number.isFinite(deltaTime)
+        ) {
+
+            deltaTime = 0.016;
+
+        }
+
+        deltaTime =
+            Math.min(
+                deltaTime,
+                0.05
+            );
+
+        if (
+            Number.isFinite(
+                cameraYaw
+            )
+        ) {
+
+            this.cameraRotation =
+                cameraYaw;
+
+        }
+
+        // ----------------------------------------------------
+        // INPUT
+        // ----------------------------------------------------
+
+        const input =
+            this.getMovementInput();
+
+        this.updateRunning(
+            deltaTime
+        );
+
+        this.updateCrouch();
+
+        // ----------------------------------------------------
+        // SPEED
+        // ----------------------------------------------------
+
+        let speed =
+            this.isRunning
+                ? this.runSpeed
+                : this.walkSpeed;
+
+        if (
+            this.isCrouching
+        ) {
+
+            speed *=
+                this.crouchSpeedMultiplier;
+
+        }
+
+        // ----------------------------------------------------
+        // MOVEMENT
+        // ----------------------------------------------------
+
+        if (
+            input.moving
+        ) {
+
+            const movement =
+                this.getWorldMovement(
+                    input.x,
+                    input.z
+                );
+
+            let control =
+                this.isGrounded
+                    ? 1
+                    : this.airControl;
+
+            const moveX =
+                movement.x *
+                speed *
+                control *
+                deltaTime;
+
+            const moveZ =
+                movement.z *
+                speed *
+                control *
+                deltaTime;
+
+            this.tryMove(
+                moveX,
+                moveZ
+            );
+
+        }
+
+        // ----------------------------------------------------
         // GRAVITY
-        // ====================================================
+        // ----------------------------------------------------
 
         this.velocity.y -=
             this.gravity *
             deltaTime;
 
+        const currentX =
+            this.object.position.x;
 
-        this.object.position.y +=
+        const currentZ =
+            this.object.position.z;
+
+        let groundY =
+            this.getGroundHeight(
+                currentX,
+                currentZ
+            );
+
+        // Player feet position
+        const targetY =
+            groundY;
+
+        const nextY =
+            this.object.position.y +
             this.velocity.y *
             deltaTime;
 
-
-        // ====================================================
+        // ----------------------------------------------------
         // GROUND COLLISION
-        // ====================================================
+        // ----------------------------------------------------
 
-        const ground =
-            this.getGroundHeight(
+        if (
+            nextY <= targetY
+        ) {
+
+            this.object.position.y =
+                targetY;
+
+            this.velocity.y =
+                0;
+
+            this.isGrounded =
+                true;
+
+            this.isJumping =
+                false;
+
+        } else {
+
+            this.object.position.y =
+                nextY;
+
+            this.isGrounded =
+                false;
+
+        }
+
+        // ----------------------------------------------------
+        // FALL PROTECTION
+        // ----------------------------------------------------
+
+        if (
+            this.object.position.y <
+            -40
+        ) {
+
+            const safe =
+                this.terrain &&
+                typeof this.terrain.findSafePosition ===
+                "function"
+                    ? this.terrain.findSafePosition(
+                        currentX,
+                        currentZ,
+                        100
+                    )
+                    : {
+                        x: 0,
+                        y: 5,
+                        z: 0
+                    };
+
+            this.object.position.set(
+                safe.x,
+                safe.y,
+                safe.z
+            );
+
+            this.velocity.set(
+                0,
+                0,
+                0
+            );
+
+            this.isGrounded =
+                true;
+
+        }
+
+        // ----------------------------------------------------
+        // ANIMATION
+        // ----------------------------------------------------
+
+        this.updateAnimation(
+            deltaTime,
+            input.moving
+        );
+
+        // ----------------------------------------------------
+        // CHUNK STREAMING
+        // ----------------------------------------------------
+
+        if (
+            this.terrain &&
+            typeof this.terrain.update ===
+            "function"
+        ) {
+
+            this.terrain.update(
                 this.object.position.x,
                 this.object.position.z
             );
 
-
-        if (
-            Number.isFinite(ground)
-        ) {
-
-            if (
-                this.object.position.y <=
-                ground
-            ) {
-
-                this.object.position.y =
-                    ground;
-
-
-                this.velocity.y = 0;
-
-                this.isGrounded =
-                    true;
-
-            } else {
-
-                this.isGrounded =
-                    false;
-            }
         }
 
-
-        // ====================================================
-        // WATER SAFETY
-        // ====================================================
-
-        if (
-            this.object.position.y <
-            1.85
-        ) {
-
-            const safe =
-                this.terrain.findSafePosition(
-                    this.object.position.x,
-                    this.object.position.z,
-                    80
-                );
-
-
-            if (safe) {
-
-                this.object.position.set(
-                    safe.x,
-                    safe.y,
-                    safe.z
-                );
-
-                this.velocity.set(
-                    0,
-                    0,
-                    0
-                );
-            }
-        }
-
-
-        // ====================================================
-        // WORLD LIMIT
-        // ====================================================
-
-        this.object.position.x =
-            THREE.MathUtils.clamp(
-                this.object.position.x,
-                -this.worldLimit,
-                this.worldLimit
-            );
-
-
-        this.object.position.z =
-            THREE.MathUtils.clamp(
-                this.object.position.z,
-                -this.worldLimit,
-                this.worldLimit
-            );
-
-
-        this.updateAnimation(
-            deltaTime,
-            moving
-        );
     }
 
-
     // ========================================================
-    // SIMPLE CHARACTER ANIMATION
+    // ANIMATION
     // ========================================================
 
     updateAnimation(
@@ -1172,54 +1486,104 @@ export class Player {
         moving
     ) {
 
-        if (!this.model) {
+        this.animationTime +=
+            deltaTime;
+
+        if (
+            !moving
+        ) {
+
+            this.currentAnimation =
+                "idle";
+
+            const idle =
+                Math.sin(
+                    this.animationTime *
+                    2
+                ) *
+                0.018;
+
+            this.bodyGroup.position.y =
+                idle;
+
+            this.leftArm.rotation.x *=
+                0.88;
+
+            this.rightArm.rotation.x *=
+                0.88;
+
+            this.leftLeg.rotation.x *=
+                0.88;
+
+            this.rightLeg.rotation.x *=
+                0.88;
+
             return;
+
         }
 
-
-        if (!moving) {
-
-            this.model.position.y =
-                0;
-
-            return;
-        }
-
-
-        const speed =
+        if (
             this.isRunning
-                ? 10
+        ) {
+
+            this.currentAnimation =
+                "run";
+
+        } else {
+
+            this.currentAnimation =
+                "walk";
+
+        }
+
+        const animationSpeed =
+            this.isRunning
+                ? 11
                 : 7;
 
-
-        const time =
-            performance.now() *
-            0.001 *
-            speed;
-
-
         const swing =
-            Math.sin(time) *
-            0.35;
+            Math.sin(
+                this.animationTime *
+                animationSpeed
+            );
 
+        const armAmount =
+            this.isRunning
+                ? 0.75
+                : 0.45;
 
-        const children =
-            this.model.children;
+        const legAmount =
+            this.isRunning
+                ? 0.85
+                : 0.55;
 
+        this.leftArm.rotation.x =
+            swing *
+            armAmount;
 
-        // Approximate leg/arm animation
+        this.rightArm.rotation.x =
+            -swing *
+            armAmount;
 
-        if (children[6]) {
-            children[6].rotation.x =
-                swing;
-        }
+        this.leftLeg.rotation.x =
+            -swing *
+            legAmount;
 
-        if (children[7]) {
-            children[7].rotation.x =
-                -swing;
-        }
+        this.rightLeg.rotation.x =
+            swing *
+            legAmount;
+
+        this.bodyGroup.position.y =
+            Math.abs(
+                swing
+            ) *
+            (
+                this.isRunning
+                    ? 0.045
+                    : 0.025
+            );
+
     }
-
 
     // ========================================================
     // TELEPORT
@@ -1227,33 +1591,44 @@ export class Player {
 
     teleport(
         x,
+        y,
         z
     ) {
 
         if (
-            !this.isSafePosition(
-                x,
-                z
-            )
+            !Number.isFinite(x) ||
+            !Number.isFinite(y) ||
+            !Number.isFinite(z)
         ) {
 
             return false;
+
         }
 
+        if (
+            this.terrain &&
+            typeof this.terrain.isInsideWorld ===
+            "function"
+        ) {
 
-        const ground =
-            this.getGroundHeight(
-                x,
-                z
-            );
+            if (
+                !this.terrain.isInsideWorld(
+                    x,
+                    z
+                )
+            ) {
 
+                return false;
+
+            }
+
+        }
 
         this.object.position.set(
             x,
-            ground,
+            y,
             z
         );
-
 
         this.velocity.set(
             0,
@@ -1261,10 +1636,15 @@ export class Player {
             0
         );
 
+        this.isGrounded =
+            false;
+
+        this.isJumping =
+            false;
 
         return true;
-    }
 
+    }
 
     // ========================================================
     // POSITION
@@ -1272,9 +1652,20 @@ export class Player {
 
     getPosition() {
 
-        return this.object.position;
-    }
+        return {
 
+            x:
+                this.object.position.x,
+
+            y:
+                this.object.position.y,
+
+            z:
+                this.object.position.z
+
+        };
+
+    }
 
     // ========================================================
     // OBJECT
@@ -1283,8 +1674,8 @@ export class Player {
     getObject() {
 
         return this.object;
-    }
 
+    }
 
     // ========================================================
     // DEBUG
@@ -1292,56 +1683,81 @@ export class Player {
 
     getDebugInfo() {
 
+        const position =
+            this.getPosition();
+
         let slope = 0;
 
+        let ground = 0;
+
         if (
-            this.terrain &&
-            typeof this.terrain.getSlopeDegrees ===
-            "function"
+            this.terrain
         ) {
 
-            slope =
-                this.terrain.getSlopeDegrees(
-                    this.object.position.x,
-                    this.object.position.z
+            ground =
+                this.getGroundHeight(
+                    position.x,
+                    position.z
                 );
-        }
 
+            if (
+                typeof this.terrain.getSlopeDegrees ===
+                "function"
+            ) {
+
+                slope =
+                    this.terrain.getSlopeDegrees(
+                        position.x,
+                        position.z
+                    );
+
+            }
+
+        }
 
         return {
 
+            name:
+                this.name,
+
             x:
-                this.object.position.x.toFixed(1),
+                position.x.toFixed(2),
 
             y:
-                this.object.position.y.toFixed(1),
+                position.y.toFixed(2),
 
             z:
-                this.object.position.z.toFixed(1),
+                position.z.toFixed(2),
+
+            ground:
+                ground.toFixed(2),
 
             slope:
-                Number.isFinite(slope)
-                    ? slope.toFixed(1)
-                    : "0.0",
+                slope.toFixed(1),
 
-            health:
-                Math.round(
-                    this.health
-                ),
+            grounded:
+                this.isGrounded,
+
+            jumping:
+                this.isJumping,
+
+            running:
+                this.isRunning,
+
+            crouching:
+                this.isCrouching,
 
             stamina:
                 Math.round(
                     this.stamina
                 ),
 
-            grounded:
-                this.isGrounded,
+            animation:
+                this.currentAnimation
 
-            running:
-                this.isRunning
         };
-    }
 
+    }
 
     // ========================================================
     // DISPOSE
@@ -1349,51 +1765,41 @@ export class Player {
 
     dispose() {
 
-        if (!this.object) {
-            return;
+        window.removeEventListener(
+            "keydown",
+            this.handleKeyDown
+        );
+
+        window.removeEventListener(
+            "keyup",
+            this.handleKeyUp
+        );
+
+        if (
+            this.scene &&
+            this.object
+        ) {
+
+            this.scene.remove(
+                this.object
+            );
+
         }
 
+        this.scene = null;
 
-        this.scene.remove(
-            this.object
-        );
-
-
-        this.object.traverse(
-            (child) => {
-
-                if (
-                    child.geometry
-                ) {
-
-                    child.geometry.dispose();
-                }
-
-
-                if (
-                    child.material
-                ) {
-
-                    if (
-                        Array.isArray(
-                            child.material
-                        )
-                    ) {
-
-                        child.material.forEach(
-                            material =>
-                                material.dispose()
-                        );
-
-                    } else {
-
-                        child.material.dispose();
-                    }
-                }
-            }
-        );
-
+        this.terrain = null;
 
         this.object = null;
+
+        this.bodyGroup = null;
+
+        this.velocity = null;
+
     }
+
 }
+
+// ============================================================
+// END OF KIAN PLAYER SYSTEM
+// ============================================================
