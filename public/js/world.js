@@ -1,226 +1,190 @@
 // ============================================================
 // WILD ISLES
-// VEYRA ISLAND
-// public/js/world.js
-//
-// HUGE OPEN WORLD SYSTEM v1.0
-//
-// Chunk based world
-// Large world coordinates
-// Chunk loading
-// Chunk unloading
-// Player based streaming
-// World position conversion
-// Distance management
-// Mobile performance support
-// Future biome streaming support
+// VEYRA WORLD
+// WORLD STRUCTURE SYSTEM v1.0
 // ============================================================
+
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
 
 export class VeyraWorld {
 
-    constructor(scene, terrain, environment) {
+    constructor(scene, terrain) {
 
         this.scene = scene;
-
         this.terrain = terrain;
 
-        this.environment = environment;
-
-        // ====================================================
+        // ========================================================
         // WORLD SETTINGS
-        // ====================================================
-
-        this.chunkSize = 256;
-
-        /*
-         * This is the logical world size.
-         *
-         * It is intentionally much larger than the
-         * current 900x900 prototype terrain.
-         *
-         * Later this can be expanded without changing
-         * the chunk system.
-         */
+        // ========================================================
 
         this.worldSize = 16384;
+        this.chunkSize = 256;
 
-        this.worldHalfSize =
-            this.worldSize / 2;
+        this.renderRadius = 1;
+        this.unloadRadius = 2;
 
-        // ====================================================
-        // CHUNK SETTINGS
-        // ====================================================
+        this.maxChunks =
+            this.renderRadius === 1
+                ? 9
+                : 25;
 
-        this.loadRadius = 2;
+        this.chunks = new Map();
 
-        this.unloadRadius = 3;
-
-        this.maxLoadedChunks = 25;
-
-        // ====================================================
-        // PERFORMANCE
-        // ====================================================
-
-        this.mobileMode =
-            window.innerWidth <= 900 ||
-            "ontouchstart" in window;
-
-        if (this.mobileMode) {
-
-            this.loadRadius = 1;
-
-            this.unloadRadius = 2;
-
-            this.maxLoadedChunks = 9;
-        }
-
-        // ====================================================
-        // CHUNK STORAGE
-        // ====================================================
-
-        this.chunks =
-            new Map();
-
-        this.loadedChunks =
-            new Map();
-
-        // ====================================================
-        // PLAYER
-        // ====================================================
-
-        this.player = null;
-
-        this.lastPlayerChunkX =
-            null;
-
-        this.lastPlayerChunkZ =
-            null;
-
-        // ====================================================
-        // UPDATE TIMER
-        // ====================================================
-
-        this.updateTimer = 0;
-
-        this.updateInterval =
-            this.mobileMode
-                ? 0.5
-                : 0.25;
-
-        // ====================================================
-        // WORLD STATE
-        // ====================================================
+        this.lastChunkX = null;
+        this.lastChunkZ = null;
 
         this.enabled = true;
 
-        this.initialized = false;
+        // ========================================================
+        // MATERIALS
+        // ========================================================
 
-        this.loading = false;
+        this.materials = {
 
-        this.pendingLoads = [];
+            road:
+                new THREE.MeshStandardMaterial({
+                    color: 0x34383b,
+                    roughness: 0.95,
+                    metalness: 0.05
+                }),
 
-        // ====================================================
-        // STATISTICS
-        // ====================================================
+            roadLine:
+                new THREE.MeshStandardMaterial({
+                    color: 0xd8c66a,
+                    roughness: 0.8
+                }),
+
+            railway:
+                new THREE.MeshStandardMaterial({
+                    color: 0x34383a,
+                    roughness: 0.85,
+                    metalness: 0.35
+                }),
+
+            rail:
+                new THREE.MeshStandardMaterial({
+                    color: 0x73787c,
+                    roughness: 0.45,
+                    metalness: 0.85
+                }),
+
+            wood:
+                new THREE.MeshStandardMaterial({
+                    color: 0x5b3925,
+                    roughness: 0.9
+                }),
+
+            wall:
+                new THREE.MeshStandardMaterial({
+                    color: 0x8b8174,
+                    roughness: 0.9
+                }),
+
+            roof:
+                new THREE.MeshStandardMaterial({
+                    color: 0x3d4144,
+                    roughness: 0.85
+                }),
+
+            metal:
+                new THREE.MeshStandardMaterial({
+                    color: 0x5d6265,
+                    roughness: 0.55,
+                    metalness: 0.7
+                }),
+
+            glass:
+                new THREE.MeshStandardMaterial({
+                    color: 0x5f8891,
+                    roughness: 0.15,
+                    metalness: 0.2,
+                    transparent: true,
+                    opacity: 0.65
+                }),
+
+            concrete:
+                new THREE.MeshStandardMaterial({
+                    color: 0x777777,
+                    roughness: 0.95
+                }),
+
+            sign:
+                new THREE.MeshStandardMaterial({
+                    color: 0xb8a77d,
+                    roughness: 0.8
+                })
+        };
+
+        // ========================================================
+        // SHARED GEOMETRY
+        // ========================================================
+
+        this.boxGeometry =
+            new THREE.BoxGeometry(
+                1,
+                1,
+                1
+            );
+
+        this.cylinderGeometry =
+            new THREE.CylinderGeometry(
+                0.5,
+                0.5,
+                1,
+                12
+            );
+
+        // ========================================================
+        // STATS
+        // ========================================================
 
         this.stats = {
 
-            loadedChunks: 0,
-
-            totalChunksCreated: 0,
-
-            totalChunksRemoved: 0,
-
-            playerChunkX: 0,
-
-            playerChunkZ: 0
-
+            chunks: 0,
+            roads: 0,
+            houses: 0,
+            factories: 0,
+            railway: 0,
+            stations: 0,
+            props: 0
         };
 
         console.log(
-            "Veyra World System v1.0 READY"
+            "Veyra World Structure System v1.0 READY"
         );
     }
 
+    // ============================================================
+    // HASH
+    // ============================================================
 
-    // ========================================================
-    // SET PLAYER
-    // ========================================================
+    hash(x, z) {
 
-    setPlayer(player) {
+        let n =
+            Math.sin(
+                x * 127.1 +
+                z * 311.7
+            ) *
+            43758.5453123;
 
-        this.player =
-            player;
-
-        if (
-            player &&
-            typeof player.getPosition ===
-            "function"
-        ) {
-
-            const position =
-                player.getPosition();
-
-            const chunk =
-                this.worldToChunk(
-                    position.x,
-                    position.z
-                );
-
-            this.lastPlayerChunkX =
-                chunk.x;
-
-            this.lastPlayerChunkZ =
-                chunk.z;
-
-            this.stats.playerChunkX =
-                chunk.x;
-
-            this.stats.playerChunkZ =
-                chunk.z;
-        }
+        return n -
+            Math.floor(n);
     }
 
+    // ============================================================
+    // CHUNK KEY
+    // ============================================================
 
-    // ========================================================
-    // INITIALIZE
-    // ========================================================
+    getKey(x, z) {
 
-    initialize() {
-
-        if (
-            this.initialized
-        ) {
-
-            return;
-        }
-
-        this.initialized =
-            true;
-
-        if (
-            this.player
-        ) {
-
-            this.updateStreaming(
-                true
-            );
-        }
-
-        console.log(
-            "Huge world streaming initialized."
-        );
+        return `${x}:${z}`;
     }
 
-
-    // ========================================================
+    // ============================================================
     // WORLD -> CHUNK
-    // ========================================================
+    // ============================================================
 
-    worldToChunk(
-        x,
-        z
-    ) {
+    worldToChunk(x, z) {
 
         return {
 
@@ -238,91 +202,17 @@ export class VeyraWorld {
         };
     }
 
+    // ============================================================
+    // CREATE CHUNK
+    // ============================================================
 
-    // ========================================================
-    // CHUNK -> WORLD
-    // ========================================================
-
-    chunkToWorld(
-        chunkX,
-        chunkZ
-    ) {
-
-        return {
-
-            x:
-                chunkX *
-                this.chunkSize,
-
-            z:
-                chunkZ *
-                this.chunkSize
-        };
-    }
-
-
-    // ========================================================
-    // CHUNK KEY
-    // ========================================================
-
-    getChunkKey(
-        chunkX,
-        chunkZ
-    ) {
-
-        return (
-            `${chunkX}:${chunkZ}`
-        );
-    }
-
-
-    // ========================================================
-    // CHECK WORLD BOUNDS
-    // ========================================================
-
-    isInsideWorld(
-        x,
-        z
-    ) {
-
-        return (
-            x >= -this.worldHalfSize &&
-            x <= this.worldHalfSize &&
-            z >= -this.worldHalfSize &&
-            z <= this.worldHalfSize
-        );
-    }
-
-
-    // ========================================================
-    // GET CHUNK
-    // ========================================================
-
-    getChunk(
-        chunkX,
-        chunkZ
-    ) {
-
-        return this.chunks.get(
-            this.getChunkKey(
-                chunkX,
-                chunkZ
-            )
-        );
-    }
-
-
-    // ========================================================
-    // CREATE CHUNK DATA
-    // ========================================================
-
-    createChunkData(
+    createChunk(
         chunkX,
         chunkZ
     ) {
 
         const key =
-            this.getChunkKey(
+            this.getKey(
                 chunkX,
                 chunkZ
             );
@@ -331,928 +221,1329 @@ export class VeyraWorld {
             this.chunks.has(key)
         ) {
 
-            return this.chunks.get(
-                key
-            );
+            return;
         }
-
-        const world =
-            this.chunkToWorld(
-                chunkX,
-                chunkZ
-            );
-
-        const chunk = {
-
-            key,
-
-            x: chunkX,
-
-            z: chunkZ,
-
-            worldX: world.x,
-
-            worldZ: world.z,
-
-            loaded: false,
-
-            active: false,
-
-            group: null,
-
-            createdAt:
-                performance.now(),
-
-            lastUsed:
-                performance.now()
-        };
-
-        this.chunks.set(
-            key,
-            chunk
-        );
-
-        this.stats.totalChunksCreated++;
-
-        return chunk;
-    }
-
-
-    // ========================================================
-    // LOAD CHUNK
-    // ========================================================
-
-    loadChunk(
-        chunkX,
-        chunkZ
-    ) {
-
-        const key =
-            this.getChunkKey(
-                chunkX,
-                chunkZ
-            );
-
-        let chunk =
-            this.chunks.get(
-                key
-            );
-
-        if (
-            !chunk
-        ) {
-
-            chunk =
-                this.createChunkData(
-                    chunkX,
-                    chunkZ
-                );
-        }
-
-        if (
-            chunk.loaded
-        ) {
-
-            chunk.lastUsed =
-                performance.now();
-
-            return chunk;
-        }
-
-        // ====================================================
-        // CHUNK GROUP
-        // ====================================================
-
-        /*
-         * The group is intentionally lightweight.
-         *
-         * Actual terrain/environment generation will be moved
-         * into chunk generation in the next world-terrain step.
-         */
 
         const group =
-            new THREEFallbackGroup();
+            new THREE.Group();
 
         group.name =
             `WorldChunk_${chunkX}_${chunkZ}`;
 
-        group.position.set(
-            chunk.worldX,
-            0,
-            chunk.worldZ
+        const centerX =
+            chunkX *
+            this.chunkSize +
+            this.chunkSize / 2;
+
+        const centerZ =
+            chunkZ *
+            this.chunkSize +
+            this.chunkSize / 2;
+
+        // ========================================================
+        // STRUCTURE SEED
+        // ========================================================
+
+        const seed =
+            this.hash(
+                chunkX,
+                chunkZ
+            );
+
+        // ========================================================
+        // ROADS
+        // ========================================================
+
+        if (
+            seed < 0.45
+        ) {
+
+            this.createRoad(
+                group,
+                centerX,
+                centerZ,
+                false
+            );
+        }
+
+        if (
+            seed > 0.65
+        ) {
+
+            this.createRoad(
+                group,
+                centerX,
+                centerZ,
+                true
+            );
+        }
+
+        // ========================================================
+        // VILLAGE
+        // ========================================================
+
+        if (
+            seed > 0.72
+        ) {
+
+            this.createVillage(
+                group,
+                centerX,
+                centerZ
+            );
+        }
+
+        // ========================================================
+        // INDUSTRIAL AREA
+        // ========================================================
+
+        if (
+            seed > 0.91
+        ) {
+
+            this.createIndustrialArea(
+                group,
+                centerX,
+                centerZ
+            );
+        }
+
+        // ========================================================
+        // RAILWAY
+        // ========================================================
+
+        if (
+            Math.abs(
+                chunkX
+            ) % 4 === 0
+        ) {
+
+            this.createRailway(
+                group,
+                centerX,
+                centerZ
+            );
+        }
+
+        // ========================================================
+        // PROPS
+        // ========================================================
+
+        this.createStreetProps(
+            group,
+            centerX,
+            centerZ,
+            seed
         );
+
+        // ========================================================
+        // ADD
+        // ========================================================
 
         this.scene.add(
             group
         );
 
-        chunk.group =
-            group;
-
-        chunk.loaded =
-            true;
-
-        chunk.active =
-            true;
-
-        chunk.lastUsed =
-            performance.now();
-
-        this.loadedChunks.set(
+        this.chunks.set(
             key,
-            chunk
+            {
+                x: chunkX,
+                z: chunkZ,
+                group
+            }
         );
 
-        this.stats.loadedChunks =
-            this.loadedChunks.size;
-
-        return chunk;
+        this.stats.chunks++;
     }
 
+    // ============================================================
+    // ROAD
+    // ============================================================
 
-    // ========================================================
-    // UNLOAD CHUNK
-    // ========================================================
-
-    unloadChunk(
-        chunkX,
-        chunkZ
+    createRoad(
+        group,
+        x,
+        z,
+        horizontal
     ) {
 
-        const key =
-            this.getChunkKey(
-                chunkX,
-                chunkZ
+        const width = 12;
+
+        const length =
+            this.chunkSize;
+
+        const geometry =
+            new THREE.BoxGeometry(
+                horizontal
+                    ? length
+                    : width,
+                0.12,
+                horizontal
+                    ? width
+                    : length
             );
+
+        const road =
+            new THREE.Mesh(
+                geometry,
+                this.materials.road
+            );
+
+        road.position.set(
+            x,
+            0.08,
+            z
+        );
+
+        group.add(
+            road
+        );
+
+        // ========================================================
+        // ROAD MARKING
+        // ========================================================
+
+        const lineGeometry =
+            new THREE.BoxGeometry(
+                horizontal
+                    ? length
+                    : 0.18,
+                0.025,
+                horizontal
+                    ? 0.18
+                    : length
+            );
+
+        const line =
+            new THREE.Mesh(
+                lineGeometry,
+                this.materials.roadLine
+            );
+
+        line.position.set(
+            x,
+            0.16,
+            z
+        );
+
+        group.add(
+            line
+        );
+
+        this.stats.roads++;
+    }
+
+    // ============================================================
+    // VILLAGE
+    // ============================================================
+
+    createVillage(
+        group,
+        centerX,
+        centerZ
+    ) {
+
+        const positions = [
+
+            [-45, -45],
+            [45, -45],
+            [-45, 45],
+            [45, 45],
+            [0, -65],
+            [0, 65]
+        ];
+
+        for (
+            let i = 0;
+            i < positions.length;
+            i++
+        ) {
+
+            const px =
+                centerX +
+                positions[i][0];
+
+            const pz =
+                centerZ +
+                positions[i][1];
+
+            this.createHouse(
+                group,
+                px,
+                pz,
+                i
+            );
+        }
+
+        // village center
+        this.createWell(
+            group,
+            centerX,
+            centerZ
+        );
+
+        // street lamps
+        for (
+            let i = -1;
+            i <= 1;
+            i++
+        ) {
+
+            this.createLamp(
+                group,
+                centerX + i * 25,
+                centerZ + 20
+            );
+        }
+    }
+
+    // ============================================================
+    // HOUSE
+    // ============================================================
+
+    createHouse(
+        group,
+        x,
+        z,
+        variant = 0
+    ) {
+
+        const house =
+            new THREE.Group();
+
+        house.position.set(
+            x,
+            0,
+            z
+        );
+
+        // --------------------------------------------------------
+        // BODY
+        // --------------------------------------------------------
+
+        const width =
+            variant % 2 === 0
+                ? 15
+                : 18;
+
+        const depth =
+            variant % 2 === 0
+                ? 13
+                : 16;
+
+        const height =
+            variant % 3 === 0
+                ? 7
+                : 8;
+
+        const bodyGeometry =
+            new THREE.BoxGeometry(
+                width,
+                height,
+                depth
+            );
+
+        const body =
+            new THREE.Mesh(
+                bodyGeometry,
+                this.materials.wall
+            );
+
+        body.position.y =
+            height / 2;
+
+        body.castShadow = true;
+        body.receiveShadow = true;
+
+        house.add(
+            body
+        );
+
+        // --------------------------------------------------------
+        // ROOF
+        // --------------------------------------------------------
+
+        const roofGeometry =
+            new THREE.ConeGeometry(
+                Math.max(
+                    width,
+                    depth
+                ) * 0.72,
+                4.5,
+                4
+            );
+
+        const roof =
+            new THREE.Mesh(
+                roofGeometry,
+                this.materials.roof
+            );
+
+        roof.rotation.y =
+            Math.PI / 4;
+
+        roof.position.y =
+            height + 2;
+
+        roof.scale.z =
+            0.78;
+
+        roof.castShadow = true;
+
+        house.add(
+            roof
+        );
+
+        // --------------------------------------------------------
+        // DOOR
+        // --------------------------------------------------------
+
+        const doorGeometry =
+            new THREE.BoxGeometry(
+                1.6,
+                3.3,
+                0.18
+            );
+
+        const door =
+            new THREE.Mesh(
+                doorGeometry,
+                this.materials.wood
+            );
+
+        door.position.set(
+            0,
+            1.65,
+            depth / 2 + 0.1
+        );
+
+        house.add(
+            door
+        );
+
+        // --------------------------------------------------------
+        // WINDOWS
+        // --------------------------------------------------------
+
+        this.createWindow(
+            house,
+            -width / 2 - 0.1,
+            height * 0.58,
+            0,
+            Math.PI / 2
+        );
+
+        this.createWindow(
+            house,
+            width / 2 + 0.1,
+            height * 0.58,
+            0,
+            -Math.PI / 2
+        );
+
+        this.createWindow(
+            house,
+            0,
+            height * 0.58,
+            depth / 2 + 0.1,
+            0
+        );
+
+        // --------------------------------------------------------
+        // CHIMNEY
+        // --------------------------------------------------------
+
+        if (
+            variant % 2 === 0
+        ) {
+
+            const chimneyGeometry =
+                new THREE.BoxGeometry(
+                    1.5,
+                    4,
+                    1.5
+                );
+
+            const chimney =
+                new THREE.Mesh(
+                    chimneyGeometry,
+                    this.materials.brick ||
+                    this.materials.wall
+                );
+
+            chimney.position.set(
+                width * 0.25,
+                height + 1,
+                depth * 0.15
+            );
+
+            house.add(
+                chimney
+            );
+        }
+
+        group.add(
+            house
+        );
+
+        this.stats.houses++;
+    }
+
+    // ============================================================
+    // WINDOW
+    // ============================================================
+
+    createWindow(
+        parent,
+        x,
+        y,
+        z,
+        rotationY
+    ) {
+
+        const frame =
+            new THREE.Mesh(
+                new THREE.BoxGeometry(
+                    2.4,
+                    2,
+                    0.18
+                ),
+                this.materials.wood
+            );
+
+        frame.position.set(
+            x,
+            y,
+            z
+        );
+
+        frame.rotation.y =
+            rotationY;
+
+        parent.add(
+            frame
+        );
+
+        const glass =
+            new THREE.Mesh(
+                new THREE.BoxGeometry(
+                    1.8,
+                    1.4,
+                    0.08
+                ),
+                this.materials.glass
+            );
+
+        glass.position.set(
+            x,
+            y,
+            z
+        );
+
+        glass.rotation.y =
+            rotationY;
+
+        parent.add(
+            glass
+        );
+    }
+
+    // ============================================================
+    // WELL
+    // ============================================================
+
+    createWell(
+        group,
+        x,
+        z
+    ) {
+
+        const well =
+            new THREE.Mesh(
+                new THREE.CylinderGeometry(
+                    2.5,
+                    2.5,
+                    1.5,
+                    16
+                ),
+                this.materials.stone ||
+                this.materials.concrete
+            );
+
+        well.position.set(
+            x,
+            0.75,
+            z
+        );
+
+        group.add(
+            well
+        );
+
+        this.stats.props++;
+    }
+
+    // ============================================================
+    // INDUSTRIAL AREA
+    // ============================================================
+
+    createIndustrialArea(
+        group,
+        x,
+        z
+    ) {
+
+        // --------------------------------------------------------
+        // FACTORY
+        // --------------------------------------------------------
+
+        const factory =
+            new THREE.Mesh(
+                new THREE.BoxGeometry(
+                    70,
+                    18,
+                    45
+                ),
+                this.materials.concrete
+            );
+
+        factory.position.set(
+            x,
+            9,
+            z
+        );
+
+        factory.castShadow = true;
+
+        group.add(
+            factory
+        );
+
+        // --------------------------------------------------------
+        // ROOF
+        // --------------------------------------------------------
+
+        const roof =
+            new THREE.Mesh(
+                new THREE.BoxGeometry(
+                    74,
+                    1.5,
+                    49
+                ),
+                this.materials.metal
+            );
+
+        roof.position.set(
+            x,
+            18.75,
+            z
+        );
+
+        group.add(
+            roof
+        );
+
+        // --------------------------------------------------------
+        // STORAGE TANKS
+        // --------------------------------------------------------
+
+        for (
+            let i = -1;
+            i <= 1;
+            i++
+        ) {
+
+            const tank =
+                new THREE.Mesh(
+                    new THREE.CylinderGeometry(
+                        5,
+                        5,
+                        14,
+                        20
+                    ),
+                    this.materials.metal
+                );
+
+            tank.position.set(
+                x + i * 13,
+                7,
+                z - 31
+            );
+
+            group.add(
+                tank
+            );
+
+            this.stats.props++;
+        }
+
+        // --------------------------------------------------------
+        // PIPES
+        // --------------------------------------------------------
+
+        for (
+            let i = 0;
+            i < 4;
+            i++
+        ) {
+
+            const pipe =
+                new THREE.Mesh(
+                    new THREE.CylinderGeometry(
+                        0.6,
+                        0.6,
+                        40,
+                        10
+                    ),
+                    this.materials.metal
+                );
+
+            pipe.rotation.z =
+                Math.PI / 2;
+
+            pipe.position.set(
+                x - 25 + i * 12,
+                12,
+                z
+            );
+
+            group.add(
+                pipe
+            );
+
+            this.stats.props++;
+        }
+
+        this.stats.factories++;
+    }
+
+    // ============================================================
+    // RAILWAY
+    // ============================================================
+
+    createRailway(
+        group,
+        x,
+        z
+    ) {
+
+        const trackLength =
+            this.chunkSize;
+
+        // --------------------------------------------------------
+        // SLEEPER BED
+        // --------------------------------------------------------
+
+        const bed =
+            new THREE.Mesh(
+                new THREE.BoxGeometry(
+                    10,
+                    0.18,
+                    trackLength
+                ),
+                this.materials.railway
+            );
+
+        bed.position.set(
+            x + 75,
+            0.12,
+            z
+        );
+
+        group.add(
+            bed
+        );
+
+        // --------------------------------------------------------
+        // RAILS
+        // --------------------------------------------------------
+
+        const railGeometry =
+            new THREE.BoxGeometry(
+                0.22,
+                0.28,
+                trackLength
+            );
+
+        const rail1 =
+            new THREE.Mesh(
+                railGeometry,
+                this.materials.rail
+            );
+
+        rail1.position.set(
+            x + 71.8,
+            0.32,
+            z
+        );
+
+        group.add(
+            rail1
+        );
+
+        const rail2 =
+            new THREE.Mesh(
+                railGeometry,
+                this.materials.rail
+            );
+
+        rail2.position.set(
+            x + 78.2,
+            0.32,
+            z
+        );
+
+        group.add(
+            rail2
+        );
+
+        // --------------------------------------------------------
+        // SLEEPERS
+        // --------------------------------------------------------
+
+        for (
+            let i = 0;
+            i < 30;
+            i++
+        ) {
+
+            const sleeper =
+                new THREE.Mesh(
+                    new THREE.BoxGeometry(
+                        9,
+                        0.25,
+                        0.65
+                    ),
+                    this.materials.wood
+                );
+
+            sleeper.position.set(
+                x + 75,
+                0.24,
+                z -
+                    trackLength / 2 +
+                    i * 8.5
+            );
+
+            group.add(
+                sleeper
+            );
+        }
+
+        // --------------------------------------------------------
+        // SIGNAL
+        // --------------------------------------------------------
+
+        this.createRailSignal(
+            group,
+            x + 87,
+            z
+        );
+
+        this.stats.railway++;
+    }
+
+    // ============================================================
+    // RAIL SIGNAL
+    // ============================================================
+
+    createRailSignal(
+        group,
+        x,
+        z
+    ) {
+
+        const pole =
+            new THREE.Mesh(
+                new THREE.CylinderGeometry(
+                    0.12,
+                    0.12,
+                    6,
+                    8
+                ),
+                this.materials.metal
+            );
+
+        pole.position.set(
+            x,
+            3,
+            z
+        );
+
+        group.add(
+            pole
+        );
+
+        const head =
+            new THREE.Mesh(
+                new THREE.BoxGeometry(
+                    0.8,
+                    1.8,
+                    0.5
+                ),
+                this.materials.metal
+            );
+
+        head.position.set(
+            x,
+            5.2,
+            z
+        );
+
+        group.add(
+            head
+        );
+
+        this.stats.props++;
+    }
+
+    // ============================================================
+    // STREET PROPS
+    // ============================================================
+
+    createStreetProps(
+        group,
+        x,
+        z,
+        seed
+    ) {
+
+        if (
+            seed < 0.35
+        ) {
+
+            this.createLamp(
+                group,
+                x - 70,
+                z - 70
+            );
+
+            this.createLamp(
+                group,
+                x + 70,
+                z + 70
+            );
+        }
+
+        if (
+            seed > 0.5 &&
+            seed < 0.75
+        ) {
+
+            this.createCrate(
+                group,
+                x + 30,
+                z + 30
+            );
+
+            this.createCrate(
+                group,
+                x - 30,
+                z - 20
+            );
+        }
+    }
+
+    // ============================================================
+    // LAMP
+    // ============================================================
+
+    createLamp(
+        group,
+        x,
+        z
+    ) {
+
+        const pole =
+            new THREE.Mesh(
+                new THREE.CylinderGeometry(
+                    0.14,
+                    0.18,
+                    6,
+                    8
+                ),
+                this.materials.metal
+            );
+
+        pole.position.set(
+            x,
+            3,
+            z
+        );
+
+        group.add(
+            pole
+        );
+
+        const lightBox =
+            new THREE.Mesh(
+                new THREE.BoxGeometry(
+                    0.8,
+                    0.45,
+                    0.8
+                ),
+                this.materials.glass
+            );
+
+        lightBox.position.set(
+            x,
+            6,
+            z
+        );
+
+        group.add(
+            lightBox
+        );
+
+        this.stats.props++;
+    }
+
+    // ============================================================
+    // CRATE
+    // ============================================================
+
+    createCrate(
+        group,
+        x,
+        z
+    ) {
+
+        const crate =
+            new THREE.Mesh(
+                new THREE.BoxGeometry(
+                    2.2,
+                    2.2,
+                    2.2
+                ),
+                this.materials.wood
+            );
+
+        crate.position.set(
+            x,
+            1.1,
+            z
+        );
+
+        crate.rotation.y =
+            this.hash(
+                x,
+                z
+            ) *
+            Math.PI;
+
+        crate.castShadow = true;
+
+        group.add(
+            crate
+        );
+
+        this.stats.props++;
+    }
+
+    // ============================================================
+    // UPDATE STREAMING
+    // ============================================================
+
+    update(
+        playerX,
+        playerZ
+    ) {
+
+        if (!this.enabled)
+            return;
+
+        if (
+            !Number.isFinite(playerX) ||
+            !Number.isFinite(playerZ)
+        ) {
+
+            return;
+        }
+
+        const chunk =
+            this.worldToChunk(
+                playerX,
+                playerZ
+            );
+
+        if (
+            chunk.x === this.lastChunkX &&
+            chunk.z === this.lastChunkZ
+        ) {
+
+            return;
+        }
+
+        this.lastChunkX =
+            chunk.x;
+
+        this.lastChunkZ =
+            chunk.z;
+
+        this.streamChunks(
+            chunk.x,
+            chunk.z
+        );
+    }
+
+    // ============================================================
+    // STREAM CHUNKS
+    // ============================================================
+
+    streamChunks(
+        centerX,
+        centerZ
+    ) {
+
+        const required =
+            new Set();
+
+        for (
+            let x =
+                centerX -
+                this.renderRadius;
+
+            x <=
+                centerX +
+                this.renderRadius;
+
+            x++
+        ) {
+
+            for (
+                let z =
+                    centerZ -
+                    this.renderRadius;
+
+                z <=
+                    centerZ +
+                    this.renderRadius;
+
+                z++
+            ) {
+
+                const key =
+                    this.getKey(
+                        x,
+                        z
+                    );
+
+                required.add(
+                    key
+                );
+
+                if (
+                    !this.chunks.has(
+                        key
+                    )
+                ) {
+
+                    this.createChunk(
+                        x,
+                        z
+                    );
+                }
+            }
+        }
+
+        // ========================================================
+        // UNLOAD
+        // ========================================================
+
+        for (
+            const [
+                key,
+                chunk
+            ] of this.chunks
+        ) {
+
+            const distanceX =
+                Math.abs(
+                    chunk.x -
+                    centerX
+                );
+
+            const distanceZ =
+                Math.abs(
+                    chunk.z -
+                    centerZ
+                );
+
+            if (
+                distanceX >
+                    this.unloadRadius ||
+                distanceZ >
+                    this.unloadRadius
+            ) {
+
+                this.removeChunk(
+                    key
+                );
+            }
+        }
+    }
+
+    // ============================================================
+    // REMOVE CHUNK
+    // ============================================================
+
+    removeChunk(
+        key
+    ) {
 
         const chunk =
             this.chunks.get(
                 key
             );
 
-        if (
-            !chunk ||
-            !chunk.loaded
-        ) {
-
+        if (!chunk)
             return;
-        }
 
-        // ====================================================
-        // REMOVE GROUP
-        // ====================================================
+        this.disposeObject(
+            chunk.group
+        );
 
         if (
-            chunk.group
+            chunk.group.parent
         ) {
 
-            if (
-                chunk.group.parent
-            ) {
-
-                chunk.group.parent.remove(
-                    chunk.group
-                );
-            }
-
-            this.disposeObject(
+            chunk.group.parent.remove(
                 chunk.group
             );
-
-            chunk.group =
-                null;
         }
 
-        chunk.loaded =
-            false;
-
-        chunk.active =
-            false;
-
-        this.loadedChunks.delete(
+        this.chunks.delete(
             key
         );
 
-        this.stats.loadedChunks =
-            this.loadedChunks.size;
-
-        this.stats.totalChunksRemoved++;
+        this.stats.chunks =
+            Math.max(
+                0,
+                this.stats.chunks - 1
+            );
     }
 
-
-    // ========================================================
-    // OBJECT DISPOSAL
-    // ========================================================
+    // ============================================================
+    // DISPOSE OBJECT
+    // ============================================================
 
     disposeObject(
         object
     ) {
 
-        if (
-            !object
-        ) {
-
-            return;
-        }
-
-        if (
-            typeof object.traverse ===
-            "function"
-        ) {
-
-            object.traverse(
-                child => {
-
-                    if (
-                        child.geometry &&
-                        typeof child.geometry.dispose ===
-                        "function"
-                    ) {
-
-                        child.geometry.dispose();
-                    }
-
-                    if (
-                        child.material
-                    ) {
-
-                        const materials =
-                            Array.isArray(
-                                child.material
-                            )
-                                ? child.material
-                                : [
-                                    child.material
-                                ];
-
-                        for (
-                            const material
-                            of materials
-                        ) {
-
-                            if (
-                                material &&
-                                typeof material.dispose ===
-                                "function"
-                            ) {
-
-                                material.dispose();
-                            }
-                        }
-                    }
-                }
-            );
-        }
-    }
-
-
-    // ========================================================
-    // GET REQUIRED CHUNKS
-    // ========================================================
-
-    getRequiredChunks(
-        centerX,
-        centerZ
-    ) {
-
-        const result = [];
-
-        for (
-            let dz =
-                -this.loadRadius;
-
-            dz <=
-            this.loadRadius;
-
-            dz++
-        ) {
-
-            for (
-                let dx =
-                    -this.loadRadius;
-
-                dx <=
-                this.loadRadius;
-
-                dx++
-            ) {
-
-                const distance =
-                    Math.max(
-                        Math.abs(dx),
-                        Math.abs(dz)
-                    );
+        object.traverse(
+            child => {
 
                 if (
-                    distance >
-                    this.loadRadius
+                    child.geometry &&
+                    child.geometry !==
+                        this.boxGeometry &&
+                    child.geometry !==
+                        this.cylinderGeometry
                 ) {
 
-                    continue;
+                    child.geometry.dispose();
                 }
-
-                result.push({
-
-                    x:
-                        centerX +
-                        dx,
-
-                    z:
-                        centerZ +
-                        dz,
-
-                    distance
-                });
             }
-        }
-
-        result.sort(
-            (a, b) =>
-                a.distance -
-                b.distance
-        );
-
-        return result;
-    }
-
-
-    // ========================================================
-    // STREAM WORLD
-    // ========================================================
-
-    updateStreaming(
-        force = false
-    ) {
-
-        if (
-            !this.enabled ||
-            !this.player
-        ) {
-
-            return;
-        }
-
-        const position =
-            this.player.getPosition();
-
-        if (
-            !position
-        ) {
-
-            return;
-        }
-
-        const currentChunk =
-            this.worldToChunk(
-                position.x,
-                position.z
-            );
-
-        this.stats.playerChunkX =
-            currentChunk.x;
-
-        this.stats.playerChunkZ =
-            currentChunk.z;
-
-        const chunkChanged =
-            currentChunk.x !==
-            this.lastPlayerChunkX ||
-
-            currentChunk.z !==
-            this.lastPlayerChunkZ;
-
-        if (
-            !force &&
-            !chunkChanged
-        ) {
-
-            return;
-        }
-
-        this.lastPlayerChunkX =
-            currentChunk.x;
-
-        this.lastPlayerChunkZ =
-            currentChunk.z;
-
-        // ====================================================
-        // LOAD NEARBY
-        // ====================================================
-
-        const required =
-            this.getRequiredChunks(
-                currentChunk.x,
-                currentChunk.z
-            );
-
-        for (
-            const requiredChunk
-            of required
-        ) {
-
-            if (
-                this.loadedChunks.size >=
-                this.maxLoadedChunks
-            ) {
-
-                break;
-            }
-
-            const key =
-                this.getChunkKey(
-                    requiredChunk.x,
-                    requiredChunk.z
-                );
-
-            if (
-                this.loadedChunks.has(
-                    key
-                )
-            ) {
-
-                const loaded =
-                    this.loadedChunks.get(
-                        key
-                    );
-
-                loaded.active =
-                    true;
-
-                loaded.lastUsed =
-                    performance.now();
-
-                continue;
-            }
-
-            this.loadChunk(
-                requiredChunk.x,
-                requiredChunk.z
-            );
-        }
-
-        // ====================================================
-        // UNLOAD DISTANT
-        // ====================================================
-
-        const unloadList = [];
-
-        for (
-            const [
-                key,
-                chunk
-            ]
-            of this.loadedChunks
-        ) {
-
-            const dx =
-                Math.abs(
-                    chunk.x -
-                    currentChunk.x
-                );
-
-            const dz =
-                Math.abs(
-                    chunk.z -
-                    currentChunk.z
-                );
-
-            const distance =
-                Math.max(
-                    dx,
-                    dz
-                );
-
-            if (
-                distance >
-                this.unloadRadius
-            ) {
-
-                unloadList.push(
-                    chunk
-                );
-            }
-        }
-
-        for (
-            const chunk
-            of unloadList
-        ) {
-
-            this.unloadChunk(
-                chunk.x,
-                chunk.z
-            );
-        }
-
-        this.enforceChunkLimit();
-    }
-
-
-    // ========================================================
-    // CHUNK LIMIT
-    // ========================================================
-
-    enforceChunkLimit() {
-
-        if (
-            this.loadedChunks.size <=
-            this.maxLoadedChunks
-        ) {
-
-            return;
-        }
-
-        const chunks =
-            Array.from(
-                this.loadedChunks.values()
-            );
-
-        chunks.sort(
-            (a, b) =>
-                a.lastUsed -
-                b.lastUsed
-        );
-
-        while (
-            this.loadedChunks.size >
-            this.maxLoadedChunks
-        ) {
-
-            const chunk =
-                chunks.shift();
-
-            if (
-                !chunk
-            ) {
-
-                break;
-            }
-
-            this.unloadChunk(
-                chunk.x,
-                chunk.z
-            );
-        }
-    }
-
-
-    // ========================================================
-    // UPDATE
-    // ========================================================
-
-    update(
-        deltaTime
-    ) {
-
-        if (
-            !Number.isFinite(
-                deltaTime
-            )
-        ) {
-
-            deltaTime =
-                0.016;
-        }
-
-        if (
-            !this.enabled
-        ) {
-
-            return;
-        }
-
-        this.updateTimer +=
-            deltaTime;
-
-        if (
-            this.updateTimer <
-            this.updateInterval
-        ) {
-
-            return;
-        }
-
-        this.updateTimer =
-            0;
-
-        this.updateStreaming(
-            false
         );
     }
 
-
-    // ========================================================
-    // WORLD POSITION
-    // ========================================================
-
-    getWorldPosition(
-        chunkX,
-        chunkZ,
-        localX = 0,
-        localZ = 0
-    ) {
-
-        const origin =
-            this.chunkToWorld(
-                chunkX,
-                chunkZ
-            );
-
-        return {
-
-            x:
-                origin.x +
-                localX,
-
-            z:
-                origin.z +
-                localZ
-        };
-    }
-
-
-    // ========================================================
-    // GET CURRENT CHUNK
-    // ========================================================
-
-    getPlayerChunk() {
-
-        if (
-            !this.player
-        ) {
-
-            return {
-
-                x: 0,
-
-                z: 0
-            };
-        }
-
-        const position =
-            this.player.getPosition();
-
-        return this.worldToChunk(
-            position.x,
-            position.z
-        );
-    }
-
-
-    // ========================================================
+    // ============================================================
     // GET STATS
-    // ========================================================
+    // ============================================================
 
     getStats() {
 
         return {
-
-            loadedChunks:
-                this.loadedChunks.size,
-
-            totalChunksCreated:
-                this.stats.totalChunksCreated,
-
-            totalChunksRemoved:
-                this.stats.totalChunksRemoved,
-
-            playerChunkX:
-                this.stats.playerChunkX,
-
-            playerChunkZ:
-                this.stats.playerChunkZ,
-
-            chunkSize:
-                this.chunkSize,
-
-            worldSize:
-                this.worldSize,
-
-            worldHalfSize:
-                this.worldHalfSize,
-
-            loadRadius:
-                this.loadRadius,
-
-            unloadRadius:
-                this.unloadRadius,
-
-            mobileMode:
-                this.mobileMode
+            ...this.stats
         };
     }
 
-
-    // ========================================================
+    // ============================================================
     // ENABLE
-    // ========================================================
+    // ============================================================
 
     enable() {
 
-        this.enabled =
-            true;
-
-        this.updateStreaming(
-            true
-        );
+        this.enabled = true;
     }
 
-
-    // ========================================================
+    // ============================================================
     // DISABLE
-    // ========================================================
+    // ============================================================
 
     disable() {
 
-        this.enabled =
-            false;
+        this.enabled = false;
     }
 
-
-    // ========================================================
-    // CLEAR WORLD
-    // ========================================================
+    // ============================================================
+    // CLEAR
+    // ============================================================
 
     clear() {
 
-        const chunks =
-            Array.from(
-                this.loadedChunks.values()
-            );
-
         for (
-            const chunk
-            of chunks
+            const [
+                key
+            ] of this.chunks
         ) {
 
-            this.unloadChunk(
-                chunk.x,
-                chunk.z
+            this.removeChunk(
+                key
             );
         }
 
         this.chunks.clear();
 
-        this.loadedChunks.clear();
-
-        this.stats.loadedChunks =
-            0;
+        this.lastChunkX = null;
+        this.lastChunkZ = null;
     }
 
-
-    // ========================================================
+    // ============================================================
     // DISPOSE
-    // ========================================================
+    // ============================================================
 
     dispose() {
 
         this.clear();
 
-        this.player =
-            null;
-
-        this.terrain =
-            null;
-
-        this.environment =
-            null;
-
-        this.scene =
-            null;
-
-        this.initialized =
-            false;
-
-        console.log(
-            "Veyra World System disposed."
-        );
-    }
-}
-
-
-// ============================================================
-// LIGHTWEIGHT GROUP FALLBACK
-//
-// This avoids importing THREE.js again just for Group.
-// The main world terrain system will replace these groups
-// with real Three.js chunk containers.
-// ============================================================
-
-class THREEFallbackGroup {
-
-    constructor() {
-
-        this.name =
-            "WorldChunk";
-
-        this.position = {
-
-            x: 0,
-
-            y: 0,
-
-            z: 0,
-
-            set:
-                (x, y, z) => {
-
-                    this.position.x =
-                        x;
-
-                    this.position.y =
-                        y;
-
-                    this.position.z =
-                        z;
-                }
-        };
-
-        this.children = [];
-
-        this.parent = null;
-    }
-
-
-    add(
-        object
-    ) {
-
         if (
-            !object
+            this.boxGeometry
         ) {
 
-            return;
-        }
-
-        this.children.push(
-            object
-        );
-
-        object.parent =
-            this;
-    }
-
-
-    remove(
-        object
-    ) {
-
-        const index =
-            this.children.indexOf(
-                object
-            );
-
-        if (
-            index !== -1
-        ) {
-
-            this.children.splice(
-                index,
-                1
-            );
+            this.boxGeometry.dispose();
         }
 
         if (
-            object
+            this.cylinderGeometry
         ) {
 
-            object.parent =
-                null;
+            this.cylinderGeometry.dispose();
         }
-    }
-
-
-    traverse(
-        callback
-    ) {
-
-        callback(
-            this
-        );
 
         for (
-            const child
-            of this.children
+            const material of
+            Object.values(
+                this.materials
+            )
         ) {
 
             if (
-                child &&
-                typeof child.traverse ===
+                material &&
+                typeof material.dispose ===
                 "function"
             ) {
 
-                child.traverse(
-                    callback
-                );
-
-            } else if (
-                child
-            ) {
-
-                callback(
-                    child
-                );
+                material.dispose();
             }
         }
+
+        this.scene = null;
+        this.terrain = null;
+
+        console.log(
+            "Veyra World Structure System DISPOSED"
+        );
     }
 }
