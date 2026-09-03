@@ -1,10 +1,11 @@
 // ============================================================
 // WILD ISLES
-// VEYRA ISLAND
-// WATER SYSTEM v0.2
+// public/js/water.js
+// Veyra Island - Realistic Water System v0.7
 // ============================================================
 
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
+import * as THREE from
+    "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
 
 export class VeyraWater {
 
@@ -12,281 +13,241 @@ export class VeyraWater {
 
         this.scene = scene;
 
-        this.ocean = null;
-        this.shallowWater = null;
-        this.beach = null;
-        this.rocks = [];
+        this.waterLevel = 1.8;
 
-        this.createOcean();
-        this.createShallowWater();
-        this.createBeach();
-        this.createCoastRocks();
+        this.size = 1000;
 
-        console.log(
-            "Veyra Water System: READY"
-        );
+        this.time = 0;
+
+        this.waveHeight = 0.12;
+
+        this.waveSpeed = 0.35;
+
+        this.waterMesh = null;
+        this.shoreMesh = null;
+
+        this.createWater();
+        this.createShoreline();
+
+        console.log("Veyra Water v0.7 READY");
     }
 
+
     // ========================================================
-    // OCEAN
+    // MAIN WATER
     // ========================================================
 
-    createOcean() {
+    createWater() {
 
-        const geometry =
-            new THREE.PlaneGeometry(
-                3000,
-                3000,
-                1,
-                1
-            );
-
-        geometry.rotateX(
-            -Math.PI / 2
+        const geometry = new THREE.PlaneGeometry(
+            this.size,
+            this.size,
+            120,
+            120
         );
 
-        const material =
-            new THREE.MeshStandardMaterial({
+        geometry.rotateX(-Math.PI / 2);
 
-                color: 0x245c68,
+        const material = new THREE.MeshStandardMaterial({
 
-                roughness: 0.16,
+            color: 0x245f68,
 
-                metalness: 0.03,
+            roughness: 0.15,
 
-                transparent: true,
+            metalness: 0.05,
 
-                opacity: 0.88,
+            transparent: true,
 
-                side: THREE.DoubleSide
-            });
+            opacity: 0.82,
 
-        this.ocean =
-            new THREE.Mesh(
-                geometry,
-                material
-            );
+            side: THREE.DoubleSide
+        });
 
-        this.ocean.position.y =
-            1.8;
-
-        this.ocean.receiveShadow =
-            true;
-
-        this.scene.add(
-            this.ocean
+        this.waterMesh = new THREE.Mesh(
+            geometry,
+            material
         );
+
+        this.waterMesh.position.y = this.waterLevel;
+
+        this.waterMesh.receiveShadow = true;
+
+        this.scene.add(this.waterMesh);
+
+        this.waterGeometry = geometry;
+
+        this.originalPositions =
+            geometry.attributes.position.array.slice();
     }
 
+
     // ========================================================
-    // SHALLOW WATER
+    // SHORELINE
     // ========================================================
 
-    createShallowWater() {
+    createShoreline() {
 
-        const geometry =
-            new THREE.RingGeometry(
-                338,
-                465,
-                128
-            );
-
-        geometry.rotateX(
-            -Math.PI / 2
+        const geometry = new THREE.RingGeometry(
+            390,
+            465,
+            160
         );
 
-        const material =
-            new THREE.MeshStandardMaterial({
+        geometry.rotateX(-Math.PI / 2);
 
-                color: 0x57999a,
+        const material = new THREE.MeshStandardMaterial({
 
-                roughness: 0.24,
+            color: 0xc8b889,
 
-                metalness: 0,
+            roughness: 1.0,
 
-                transparent: true,
+            metalness: 0,
 
-                opacity: 0.48,
+            transparent: true,
 
-                side: THREE.DoubleSide
-            });
+            opacity: 0.65,
 
-        this.shallowWater =
-            new THREE.Mesh(
-                geometry,
-                material
-            );
+            side: THREE.DoubleSide
+        });
 
-        this.shallowWater.position.y =
-            2.5;
-
-        this.scene.add(
-            this.shallowWater
+        this.shoreMesh = new THREE.Mesh(
+            geometry,
+            material
         );
+
+        this.shoreMesh.position.y =
+            this.waterLevel - 0.03;
+
+        this.scene.add(this.shoreMesh);
     }
 
-    // ========================================================
-    // BEACH
-    // ========================================================
-
-    createBeach() {
-
-        const geometry =
-            new THREE.RingGeometry(
-                325,
-                390,
-                128
-            );
-
-        geometry.rotateX(
-            -Math.PI / 2
-        );
-
-        const material =
-            new THREE.MeshStandardMaterial({
-
-                color: 0xbca875,
-
-                roughness: 1.0,
-
-                metalness: 0.0,
-
-                side: THREE.DoubleSide
-            });
-
-        this.beach =
-            new THREE.Mesh(
-                geometry,
-                material
-            );
-
-        this.beach.position.y =
-            1.6;
-
-        this.beach.receiveShadow =
-            true;
-
-        this.scene.add(
-            this.beach
-        );
-    }
 
     // ========================================================
-    // COAST ROCKS
+    // WATER ANIMATION
     // ========================================================
 
-    createCoastRocks() {
+    update(deltaTime, elapsedTime) {
 
-        const rockMaterial =
-            new THREE.MeshStandardMaterial({
+        if (!this.waterMesh) return;
 
-                color: 0x4a514b,
+        this.time += deltaTime || 0.016;
 
-                roughness: 0.95,
+        const geometry = this.waterGeometry;
 
-                metalness: 0.0
-            });
+        const position =
+            geometry.attributes.position;
 
-        const rockCount = 65;
+        const original =
+            this.originalPositions;
 
         for (
             let i = 0;
-            i < rockCount;
+            i < position.count;
             i++
         ) {
 
-            const angle =
-                Math.random() *
-                Math.PI *
-                2;
+            const x = original[i * 3];
 
-            const radius =
-                315 +
-                Math.random() * 75;
+            const z = original[i * 3 + 2];
 
-            const x =
-                Math.cos(angle) *
-                radius;
+            const wave1 =
+                Math.sin(
+                    x * 0.035 +
+                    this.time * this.waveSpeed
+                ) * this.waveHeight;
 
-            const z =
-                Math.sin(angle) *
-                radius;
+            const wave2 =
+                Math.cos(
+                    z * 0.045 +
+                    this.time * this.waveSpeed * 0.8
+                ) * this.waveHeight * 0.65;
 
-            const size =
-                1.5 +
-                Math.random() * 5;
+            const wave3 =
+                Math.sin(
+                    (x + z) * 0.018 +
+                    this.time * 0.25
+                ) * 0.06;
 
-            const geometry =
-                new THREE.DodecahedronGeometry(
-                    size,
-                    0
-                );
-
-            const rock =
-                new THREE.Mesh(
-                    geometry,
-                    rockMaterial
-                );
-
-            rock.position.set(
-                x,
-                1.5 +
-                Math.random() * 3,
-                z
+            position.setY(
+                i,
+                wave1 + wave2 + wave3
             );
+        }
 
-            rock.rotation.set(
-                Math.random() * 0.6,
-                Math.random() * Math.PI,
-                Math.random() * 0.6
-            );
+        position.needsUpdate = true;
 
-            rock.scale.y =
-                0.55 +
-                Math.random() * 0.6;
+        geometry.computeVertexNormals();
 
-            rock.castShadow =
-                true;
 
-            rock.receiveShadow =
-                true;
+        // ====================================================
+        // SUBTLE WATER MATERIAL ANIMATION
+        // ====================================================
 
-            this.scene.add(
-                rock
-            );
+        if (this.waterMesh.material) {
 
-            this.rocks.push(
-                rock
-            );
+            this.waterMesh.material.opacity =
+                0.78 +
+                Math.sin(this.time * 0.5) * 0.025;
         }
     }
 
+
     // ========================================================
-    // WATER UPDATE
+    // WATER HEIGHT
     // ========================================================
 
-    update(
-        delta,
-        elapsedTime
-    ) {
+    getWaterLevel() {
 
-        if (!this.ocean) {
-            return;
+        return this.waterLevel;
+    }
+
+
+    // ========================================================
+    // CHECK WATER
+    // ========================================================
+
+    isWater(x, z) {
+
+        const distance =
+            Math.sqrt(
+                x * x +
+                z * z
+            );
+
+        return distance > 410;
+    }
+
+
+    // ========================================================
+    // CLEANUP
+    // ========================================================
+
+    dispose() {
+
+        if (this.waterMesh) {
+
+            this.waterMesh.geometry.dispose();
+
+            this.waterMesh.material.dispose();
+
+            this.scene.remove(
+                this.waterMesh
+            );
+
+            this.waterMesh = null;
         }
 
-        const wave =
-            Math.sin(
-                elapsedTime * 0.35
-            ) * 0.08;
+        if (this.shoreMesh) {
 
-        this.ocean.position.y =
-            1.8 + wave;
+            this.shoreMesh.geometry.dispose();
 
-        if (this.shallowWater) {
+            this.shoreMesh.material.dispose();
 
-            this.shallowWater.position.y =
-                2.5 +
-                wave * 0.5;
+            this.scene.remove(
+                this.shoreMesh
+            );
+
+            this.shoreMesh = null;
         }
     }
 }
