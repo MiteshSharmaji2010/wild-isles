@@ -1,12 +1,14 @@
 // ============================================================
 // WILD ISLES
-// VEYRA ISLAND
-// MAIN GAME ENGINE v0.9
+// VEYRA WORLD
+// MAIN GAME ENGINE v1.0
 //
 // Scene
 // Camera
 // Renderer
 // Lighting
+// Huge World
+// Chunk Streaming
 // Terrain
 // Water
 // Environment
@@ -70,7 +72,8 @@ class WildIslesGame {
         // CLOCK
         // =====================================================
 
-        this.clock = new THREE.Clock();
+        this.clock =
+            new THREE.Clock();
 
         this.elapsedTime = 0;
 
@@ -78,15 +81,20 @@ class WildIslesGame {
         // CAMERA
         // =====================================================
 
-        this.cameraYaw = Math.PI;
+        this.cameraYaw =
+            Math.PI;
 
-        this.cameraPitch = 0.28;
+        this.cameraPitch =
+            0.28;
 
-        this.cameraDistance = 7.2;
+        this.cameraDistance =
+            7.2;
 
-        this.cameraHeight = 2.9;
+        this.cameraHeight =
+            2.9;
 
-        this.cameraSensitivity = 0.003;
+        this.cameraSensitivity =
+            0.003;
 
         this.cameraTarget =
             new THREE.Vector3();
@@ -94,36 +102,69 @@ class WildIslesGame {
         this.cameraPosition =
             new THREE.Vector3();
 
-        this.cameraInitialized = false;
+        this.cameraInitialized =
+            false;
 
         // =====================================================
         // MOUSE
         // =====================================================
 
-        this.mouseDown = false;
+        this.mouseDown =
+            false;
 
-        this.lastMouseX = 0;
-        this.lastMouseY = 0;
+        this.lastMouseX =
+            0;
+
+        this.lastMouseY =
+            0;
 
         // =====================================================
         // WORLD
         // =====================================================
 
-        this.day = 1;
+        this.day =
+            1;
 
-        this.worldTime = 8.0;
+        this.worldTime =
+            8.0;
 
-        // Kept for compatibility with previous system.
-        // DayNightSystem now controls the actual day/night cycle.
-        this.dayLength = 600;
+        this.dayLength =
+            600;
+
+        // =====================================================
+        // HUGE WORLD
+        // =====================================================
+
+        this.worldSize =
+            16384;
+
+        this.worldHalfSize =
+            this.worldSize / 2;
+
+        this.chunkSize =
+            256;
+
+        this.currentChunkX =
+            null;
+
+        this.currentChunkZ =
+            null;
+
+        this.chunkUpdateTimer =
+            0;
+
+        this.chunkUpdateInterval =
+            0.15;
 
         // =====================================================
         // GAME STATE
         // =====================================================
 
-        this.started = false;
+        this.started =
+            false;
 
-        this.paused = false;
+        this.paused =
+            false;
 
         this.mobileMode =
             window.innerWidth <= 900 ||
@@ -176,17 +217,19 @@ class WildIslesGame {
 
             this.setLoading(
                 5,
-                "Creating Veyra Island..."
+                "Creating Veyra World..."
             );
 
             this.createScene();
 
+
             this.setLoading(
                 15,
-                "Building atmosphere..."
+                "Preparing huge world camera..."
             );
 
             this.createCamera();
+
 
             this.setLoading(
                 25,
@@ -197,47 +240,63 @@ class WildIslesGame {
 
             this.createLights();
 
+
             this.setLoading(
                 35,
-                "Generating terrain..."
+                "Generating world terrain..."
             );
 
             this.createTerrain();
 
+
             this.setLoading(
                 50,
-                "Creating water..."
+                "Loading nearby world chunks..."
             );
 
             this.createWater();
 
+
             this.setLoading(
-                65,
-                "Growing vegetation..."
+                62,
+                "Growing Veyra vegetation..."
             );
 
             this.createEnvironment();
 
+
             this.setLoading(
-                76,
+                74,
                 "Creating Kian..."
             );
 
             this.createPlayer();
 
+
+            // =================================================
+            // INITIAL TERRAIN STREAM
+            // =================================================
+
+            this.updateTerrainStreaming(
+                true
+            );
+
+
             this.setLoading(
-                84,
+                82,
                 "Preparing survival system..."
             );
 
             this.createSurvival();
 
+
             this.setLoading(
-                89,
+                88,
                 "Creating day and night..."
             );
 
             this.createDayNight();
+
 
             this.setLoading(
                 94,
@@ -250,12 +309,17 @@ class WildIslesGame {
 
             this.setupUI();
 
+
             this.setLoading(
                 100,
-                "Veyra Island ready."
+                "WILD ISLES WORLD READY."
             );
 
-            await this.wait(450);
+
+            await this.wait(
+                450
+            );
+
 
             this.startGame();
 
@@ -294,10 +358,11 @@ class WildIslesGame {
                 0.0017
             );
 
-        this.scene.environment = null;
+        this.scene.environment =
+            null;
 
         console.log(
-            "Scene created"
+            "Huge world scene created"
         );
     }
 
@@ -310,11 +375,15 @@ class WildIslesGame {
 
         this.camera =
             new THREE.PerspectiveCamera(
+
                 65,
+
                 window.innerWidth /
                 window.innerHeight,
+
                 0.1,
-                1600
+
+                2200
             );
 
         this.camera.position.set(
@@ -330,7 +399,7 @@ class WildIslesGame {
         );
 
         console.log(
-            "Camera created"
+            "Huge world camera created"
         );
     }
 
@@ -356,9 +425,14 @@ class WildIslesGame {
         );
 
         this.renderer.setPixelRatio(
+
             Math.min(
+
                 window.devicePixelRatio || 1,
-                1.5
+
+                this.mobileMode
+                    ? 1.25
+                    : 1.5
             )
         );
 
@@ -389,7 +463,8 @@ class WildIslesGame {
             );
         }
 
-        container.innerHTML = "";
+        container.innerHTML =
+            "";
 
         container.appendChild(
             this.renderer.domElement
@@ -409,8 +484,11 @@ class WildIslesGame {
 
         const hemisphere =
             new THREE.HemisphereLight(
+
                 0xbdd2dc,
+
                 0x3b4938,
+
                 1.8
             );
 
@@ -434,7 +512,9 @@ class WildIslesGame {
 
         this.sun =
             new THREE.DirectionalLight(
+
                 0xfff1d0,
+
                 3.0
             );
 
@@ -444,7 +524,8 @@ class WildIslesGame {
             120
         );
 
-        this.sun.castShadow = true;
+        this.sun.castShadow =
+            true;
 
         this.sun.shadow.mapSize.width =
             2048;
@@ -484,7 +565,9 @@ class WildIslesGame {
 
         const fill =
             new THREE.DirectionalLight(
+
                 0x9bb7c8,
+
                 0.65
             );
 
@@ -518,8 +601,35 @@ class WildIslesGame {
                 this.scene
             );
 
+        // Make main game values follow terrain.
+        if (
+            Number.isFinite(
+                this.terrain.worldSize
+            )
+        ) {
+
+            this.worldSize =
+                this.terrain.worldSize;
+
+            this.worldHalfSize =
+                this.terrain.worldHalfSize;
+        }
+
+        if (
+            Number.isFinite(
+                this.terrain.chunkSize
+            )
+        ) {
+
+            this.chunkSize =
+                this.terrain.chunkSize;
+        }
+
         console.log(
-            "Terrain connected"
+            "Huge terrain connected:",
+            this.worldSize,
+            "x",
+            this.worldSize
         );
     }
 
@@ -549,7 +659,9 @@ class WildIslesGame {
 
         this.environment =
             new VeyraEnvironment(
+
                 this.scene,
+
                 this.terrain
             );
 
@@ -567,7 +679,9 @@ class WildIslesGame {
 
         this.player =
             new Player(
+
                 this.scene,
+
                 this.terrain
             );
 
@@ -576,7 +690,91 @@ class WildIslesGame {
         );
 
         console.log(
-            "Player connected"
+            "Kian connected"
+        );
+    }
+
+
+    // ========================================================
+    // TERRAIN CHUNK STREAMING
+    // ========================================================
+
+    updateTerrainStreaming(
+        force = false
+    ) {
+
+        if (
+            !this.player ||
+            !this.terrain
+        ) {
+
+            return;
+        }
+
+        const position =
+            this.player.getPosition();
+
+        if (
+            !position
+        ) {
+
+            return;
+        }
+
+        if (
+            typeof this.terrain.update !==
+            "function"
+        ) {
+
+            return;
+        }
+
+        const chunkSize =
+            Number.isFinite(
+                this.terrain.chunkSize
+            )
+                ? this.terrain.chunkSize
+                : this.chunkSize;
+
+        const chunkX =
+            Math.floor(
+                position.x /
+                chunkSize
+            );
+
+        const chunkZ =
+            Math.floor(
+                position.z /
+                chunkSize
+            );
+
+        const changed =
+            chunkX !==
+                this.currentChunkX ||
+            chunkZ !==
+                this.currentChunkZ;
+
+        if (
+            !force &&
+            !changed
+        ) {
+
+            return;
+        }
+
+        this.currentChunkX =
+            chunkX;
+
+        this.currentChunkZ =
+            chunkZ;
+
+        this.terrain.update(
+            position.x,
+            position.z
+        );
+
+        console.log(
+            `World Chunk: ${chunkX}, ${chunkZ}`
         );
     }
 
@@ -599,7 +797,9 @@ class WildIslesGame {
 
         this.survival =
             new SurvivalSystem(
+
                 this.player,
+
                 this.terrain
             );
 
@@ -655,7 +855,8 @@ class WildIslesGame {
                     return;
                 }
 
-                this.mouseDown = true;
+                this.mouseDown =
+                    true;
 
                 this.lastMouseX =
                     event.clientX;
@@ -674,7 +875,8 @@ class WildIslesGame {
             "mouseup",
             () => {
 
-                this.mouseDown = false;
+                this.mouseDown =
+                    false;
             }
         );
 
@@ -718,8 +920,11 @@ class WildIslesGame {
 
                 this.cameraPitch =
                     THREE.MathUtils.clamp(
+
                         this.cameraPitch,
+
                         -0.15,
+
                         0.95
                     );
 
@@ -798,7 +1003,9 @@ class WildIslesGame {
 
                     event.preventDefault();
 
-                    this.player.keys["ShiftLeft"] =
+                    this.player.keys[
+                        "ShiftLeft"
+                    ] =
                         true;
                 };
 
@@ -807,7 +1014,9 @@ class WildIslesGame {
 
                     event.preventDefault();
 
-                    this.player.keys["ShiftLeft"] =
+                    this.player.keys[
+                        "ShiftLeft"
+                    ] =
                         false;
                 };
 
@@ -852,13 +1061,16 @@ class WildIslesGame {
         ) {
 
             jumpButton.addEventListener(
+
                 "touchstart",
+
                 (event) => {
 
                     event.preventDefault();
 
                     this.player.jump();
                 },
+
                 {
                     passive: false
                 }
@@ -880,7 +1092,9 @@ class WildIslesGame {
         ) {
 
             actionButton.addEventListener(
+
                 "touchstart",
+
                 (event) => {
 
                     event.preventDefault();
@@ -889,6 +1103,7 @@ class WildIslesGame {
                         "NO INTERACTION NEARBY"
                     );
                 },
+
                 {
                     passive: false
                 }
@@ -926,16 +1141,21 @@ class WildIslesGame {
                     window.innerHeight
                 );
 
-                this.renderer.setPixelRatio(
-                    Math.min(
-                        window.devicePixelRatio || 1,
-                        1.5
-                    )
-                );
-
                 this.mobileMode =
                     window.innerWidth <= 900 ||
                     "ontouchstart" in window;
+
+                this.renderer.setPixelRatio(
+
+                    Math.min(
+
+                        window.devicePixelRatio || 1,
+
+                        this.mobileMode
+                            ? 1.25
+                            : 1.5
+                    )
+                );
             }
         );
     }
@@ -966,7 +1186,9 @@ class WildIslesGame {
     // CAMERA FOLLOW
     // ========================================================
 
-    updateCamera(deltaTime) {
+    updateCamera(
+        deltaTime
+    ) {
 
         if (
             !this.player ||
@@ -1019,6 +1241,7 @@ class WildIslesGame {
         this.cameraPosition.set(
 
             playerPosition.x -
+
             Math.sin(
                 this.cameraYaw
             ) *
@@ -1029,6 +1252,7 @@ class WildIslesGame {
             verticalDistance,
 
             playerPosition.z -
+
             Math.cos(
                 this.cameraYaw
             ) *
@@ -1046,7 +1270,9 @@ class WildIslesGame {
 
             const cameraGround =
                 this.terrain.getGroundHeight(
+
                     this.cameraPosition.x,
+
                     this.cameraPosition.z
                 );
 
@@ -1090,12 +1316,15 @@ class WildIslesGame {
                 this.cameraPosition
             );
 
-            this.cameraInitialized = true;
+            this.cameraInitialized =
+                true;
 
         } else {
 
             this.camera.position.lerp(
+
                 this.cameraPosition,
+
                 THREE.MathUtils.clamp(
                     smoothing,
                     0,
@@ -1119,17 +1348,17 @@ class WildIslesGame {
     // WORLD TIME
     // ========================================================
 
-    updateWorldTime(deltaTime) {
-
-        // DayNightSystem is now responsible
-        // for the actual time progression.
+    updateWorldTime(
+        deltaTime
+    ) {
 
         if (
             this.dayNight
         ) {
 
             this.day =
-                this.dayNight.day || this.day;
+                this.dayNight.day ||
+                this.day;
 
             this.worldTime =
                 this.dayNight.timeOfDay ??
@@ -1140,19 +1369,25 @@ class WildIslesGame {
             return;
         }
 
+
         // ====================================================
         // FALLBACK
         // ====================================================
 
         this.worldTime +=
+
             deltaTime *
-            (24 / this.dayLength);
+            (
+                24 /
+                this.dayLength
+            );
 
         if (
             this.worldTime >= 24
         ) {
 
-            this.worldTime -= 24;
+            this.worldTime -=
+                24;
 
             this.day++;
         }
@@ -1177,7 +1412,8 @@ class WildIslesGame {
         }
 
         const normalized =
-            this.worldTime / 24;
+            this.worldTime /
+            24;
 
         const angle =
             normalized *
@@ -1185,29 +1421,41 @@ class WildIslesGame {
             2;
 
         const sunX =
-            Math.cos(angle) *
+            Math.cos(
+                angle
+            ) *
             300;
 
         const sunY =
-            Math.sin(angle) *
+            Math.sin(
+                angle
+            ) *
             300;
 
         const sunZ =
             100;
 
         this.sun.position.set(
+
             sunX,
+
             Math.max(
                 25,
                 sunY
             ),
+
             sunZ
         );
 
         const daylight =
             THREE.MathUtils.clamp(
-                Math.sin(angle),
+
+                Math.sin(
+                    angle
+                ),
+
                 0.05,
+
                 1
             );
 
@@ -1290,7 +1538,7 @@ class WildIslesGame {
         ) {
 
             location.textContent =
-                "VEYRA ISLAND";
+                "VEYRA WORLD";
         }
     }
 
@@ -1344,8 +1592,11 @@ class WildIslesGame {
 
             const healthPercent =
                 THREE.MathUtils.clamp(
+
                     this.player.health,
+
                     0,
+
                     100
                 );
 
@@ -1364,8 +1615,11 @@ class WildIslesGame {
 
             const staminaPercent =
                 THREE.MathUtils.clamp(
+
                     this.player.stamina,
+
                     0,
+
                     100
                 );
 
@@ -1379,483 +1633,4 @@ class WildIslesGame {
         // ====================================================
 
         if (
-            this.survival
-        ) {
-
-            const status =
-                this.survival.getStatus();
-
-
-            if (
-                hunger
-            ) {
-
-                hunger.textContent =
-                    String(
-                        status.hunger
-                    );
-            }
-
-
-            if (
-                thirst
-            ) {
-
-                thirst.textContent =
-                    String(
-                        status.thirst
-                    );
-            }
-
-
-            if (
-                temperature
-            ) {
-
-                const temp =
-                    status.temperature;
-
-                const celsius =
-                    Math.round(
-                        -10 +
-                        temp * 0.6
-                    );
-
-                temperature.textContent =
-                    `${celsius}°C`;
-            }
-        }
-
-
-        // ====================================================
-        // DEBUG
-        // ====================================================
-
-        const debug =
-            document.getElementById(
-                "debug-info"
-            );
-
-        if (
-            debug &&
-            typeof this.player.getDebugInfo ===
-            "function"
-        ) {
-
-            const info =
-                this.player.getDebugInfo();
-
-            let survivalText = "";
-
-            if (
-                this.survival
-            ) {
-
-                const status =
-                    this.survival.getStatus();
-
-                survivalText =
-                    ` | H ${status.hunger} T ${status.thirst}`;
-            }
-
-            let dayNightText = "";
-
-            if (
-                this.dayNight
-            ) {
-
-                const formattedTime =
-                    this.dayNight.getFormattedTime();
-
-                const night =
-                    typeof this.dayNight.isNight ===
-                    "function" &&
-                    this.dayNight.isNight();
-
-                dayNightText =
-                    ` | ${formattedTime}${night ? " NIGHT" : " DAY"}`;
-            }
-
-            debug.textContent =
-                `X ${info.x} | Y ${info.y} | Z ${info.z} | Slope ${info.slope}°${survivalText}${dayNightText}`;
-        }
-    }
-
-
-    // ========================================================
-    // INTERACTION
-    // ========================================================
-
-    showInteraction(
-        message
-    ) {
-
-        const element =
-            document.getElementById(
-                "interaction-message"
-            );
-
-        if (
-            !element
-        ) {
-
-            return;
-        }
-
-        element.textContent =
-            message;
-
-        element.classList.add(
-            "show"
-        );
-
-        clearTimeout(
-            this.interactionTimeout
-        );
-
-        this.interactionTimeout =
-            setTimeout(
-                () => {
-
-                    element.classList.remove(
-                        "show"
-                    );
-
-                },
-                2200
-            );
-    }
-
-
-    // ========================================================
-    // LOADING
-    // ========================================================
-
-    setLoading(
-        progress,
-        text
-    ) {
-
-        if (
-            this.loadingProgress
-        ) {
-
-            this.loadingProgress.style.width =
-                `${progress}%`;
-        }
-
-        if (
-            this.loadingText
-        ) {
-
-            this.loadingText.textContent =
-                text;
-        }
-    }
-
-
-    // ========================================================
-    // START GAME
-    // ========================================================
-
-    startGame() {
-
-        this.started = true;
-
-        if (
-            this.loadingScreen
-        ) {
-
-            this.loadingScreen.style.opacity =
-                "0";
-
-            setTimeout(
-                () => {
-
-                    if (
-                        this.loadingScreen
-                    ) {
-
-                        this.loadingScreen.style.display =
-                            "none";
-                    }
-
-                },
-                500
-            );
-        }
-
-        if (
-            this.gameUI
-        ) {
-
-            this.gameUI.classList.remove(
-                "hidden"
-            );
-        }
-
-        // Synchronize initial world time.
-        this.updateWorldTime(0);
-
-        // Ensure initial UI is ready.
-        this.updatePlayerUI();
-
-        this.animate();
-
-        console.log(
-            "WILD ISLES STARTED"
-        );
-    }
-
-
-    // ========================================================
-    // ANIMATION LOOP
-    // ========================================================
-
-    animate() {
-
-        requestAnimationFrame(
-            () => this.animate()
-        );
-
-        if (
-            !this.started
-        ) {
-
-            return;
-        }
-
-
-        // ====================================================
-        // DELTA TIME
-        // ====================================================
-
-        const deltaTime =
-            Math.min(
-                this.clock.getDelta(),
-                0.05
-            );
-
-        this.elapsedTime +=
-            deltaTime;
-
-
-        // ====================================================
-        // PLAYER
-        // ====================================================
-
-        if (
-            this.player
-        ) {
-
-            this.player.update(
-                deltaTime,
-                this.cameraYaw
-            );
-        }
-
-
-        // ====================================================
-        // SURVIVAL
-        // ====================================================
-
-        if (
-            this.survival
-        ) {
-
-            this.survival.update(
-                deltaTime,
-                this.elapsedTime
-            );
-        }
-
-
-        // ====================================================
-        // DAY / NIGHT
-        // ====================================================
-
-        if (
-            this.dayNight
-        ) {
-
-            this.dayNight.update(
-                deltaTime
-            );
-
-            // Read current time after update.
-            if (
-                Number.isFinite(
-                    this.dayNight.timeOfDay
-                )
-            ) {
-
-                this.worldTime =
-                    this.dayNight.timeOfDay;
-            }
-
-            if (
-                Number.isFinite(
-                    this.dayNight.day
-                )
-            ) {
-
-                this.day =
-                    this.dayNight.day;
-            }
-        }
-
-
-        // ====================================================
-        // CAMERA
-        // ====================================================
-
-        this.updateCamera(
-            deltaTime
-        );
-
-
-        // ====================================================
-        // WORLD
-        // ====================================================
-
-        this.updateWorldTime(
-            0
-        );
-
-
-        // ====================================================
-        // ENVIRONMENT
-        // ====================================================
-
-        if (
-            this.environment &&
-            typeof this.environment.update ===
-            "function"
-        ) {
-
-            this.environment.update(
-                deltaTime,
-                this.elapsedTime
-            );
-        }
-
-
-        // ====================================================
-        // WATER
-        // ====================================================
-
-        if (
-            this.water &&
-            typeof this.water.update ===
-            "function"
-        ) {
-
-            this.water.update(
-                deltaTime,
-                this.elapsedTime
-            );
-        }
-
-
-        // ====================================================
-        // UI
-        // ====================================================
-
-        this.updatePlayerUI();
-
-
-        // ====================================================
-        // RENDER
-        // ====================================================
-
-        if (
-            this.renderer &&
-            this.scene &&
-            this.camera
-        ) {
-
-            this.renderer.render(
-                this.scene,
-                this.camera
-            );
-        }
-    }
-
-
-    // ========================================================
-    // WAIT
-    // ========================================================
-
-    wait(
-        milliseconds
-    ) {
-
-        return new Promise(
-            (resolve) => {
-
-                setTimeout(
-                    resolve,
-                    milliseconds
-                );
-            }
-        );
-    }
-
-
-    // ========================================================
-    // FATAL ERROR
-    // ========================================================
-
-    showFatalError(
-        error
-    ) {
-
-        console.error(
-            error
-        );
-
-        if (
-            this.loadingScreen
-        ) {
-
-            this.loadingScreen.style.display =
-                "flex";
-
-            this.loadingScreen.style.opacity =
-                "1";
-        }
-
-        if (
-            this.loadingText
-        ) {
-
-            this.loadingText.innerHTML =
-                "WORLD FAILED TO LOAD.<br><br>" +
-                "Open browser console (F12) " +
-                "for the error.";
-        }
-
-        if (
-            this.loadingProgress
-        ) {
-
-            this.loadingProgress.style.width =
-                "100%";
-        }
-    }
-}
-
-
-// ============================================================
-// START GAME
-// ============================================================
-
-window.addEventListener(
-    "DOMContentLoaded",
-    () => {
-
-        window.wildIsles =
-            new WildIslesGame();
-
-    }
-);
+            this.s
