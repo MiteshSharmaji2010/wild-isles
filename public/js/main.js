@@ -1,78 +1,95 @@
+// ============================================================
+// WILD ISLES
+// VEYRA ISLAND
+// MAIN GAME
+// STEP 6 - PLAYER
+// ============================================================
+
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
 
 import { VeyraTerrain } from "./terrain.js";
 import { VeyraWater } from "./water.js";
 import { VeyraEnvironment } from "./environment.js";
+import { Player } from "./player.js";
 
 // ============================================================
-// WILD ISLES
-// VEYRA ISLAND
-// WORLD FOUNDATION v0.3
+// GAME VARIABLES
 // ============================================================
 
-// ------------------------------------------------------------
-// DOM ELEMENTS
-// ------------------------------------------------------------
+const container =
+    document.getElementById("game-container");
 
-const container = document.getElementById("game-container");
-const loadingScreen = document.getElementById("loading-screen");
-const loadingProgress = document.getElementById("loading-progress");
-const loadingText = document.getElementById("loading-text");
+const loadingScreen =
+    document.getElementById("loading-screen");
 
-// ------------------------------------------------------------
-// SAFETY CHECK
-// ------------------------------------------------------------
+const loadingProgress =
+    document.getElementById("loading-progress");
 
-if (!container) {
-    throw new Error("Game container #game-container not found.");
+const loadingText =
+    document.getElementById("loading-text");
+
+// ============================================================
+// LOADING
+// ============================================================
+
+function setLoading(progress, message) {
+
+    if (loadingProgress) {
+        loadingProgress.style.width =
+            progress + "%";
+    }
+
+    if (loadingText) {
+        loadingText.textContent =
+            message;
+    }
 }
 
 // ============================================================
 // SCENE
 // ============================================================
 
-const scene = new THREE.Scene();
+const scene =
+    new THREE.Scene();
 
-const skyColor = new THREE.Color(0x87a7b5);
+scene.background =
+    new THREE.Color(0x87a9b5);
 
-scene.background = skyColor;
-
-scene.fog = new THREE.FogExp2(
-    skyColor,
-    0.0018
-);
+scene.fog =
+    new THREE.Fog(
+        0x87a9b5,
+        180,
+        850
+    );
 
 // ============================================================
 // CAMERA
 // ============================================================
 
-const camera = new THREE.PerspectiveCamera(
-    65,
-    window.innerWidth / window.innerHeight,
-    0.1,
-    5000
-);
+const camera =
+    new THREE.PerspectiveCamera(
+        65,
+        window.innerWidth /
+        window.innerHeight,
+        0.1,
+        2000
+    );
 
 camera.position.set(
     0,
-    120,
-    260
-);
-
-camera.lookAt(
-    0,
-    30,
-    0
+    6,
+    10
 );
 
 // ============================================================
 // RENDERER
 // ============================================================
 
-const renderer = new THREE.WebGLRenderer({
-    antialias: true,
-    powerPreference: "high-performance"
-});
+const renderer =
+    new THREE.WebGLRenderer({
+        antialias: true,
+        powerPreference: "high-performance"
+    });
 
 renderer.setSize(
     window.innerWidth,
@@ -81,7 +98,7 @@ renderer.setSize(
 
 renderer.setPixelRatio(
     Math.min(
-        window.devicePixelRatio || 1,
+        window.devicePixelRatio,
         1.5
     )
 );
@@ -91,292 +108,166 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type =
     THREE.PCFSoftShadowMap;
 
-renderer.outputColorSpace =
-    THREE.SRGBColorSpace;
-
-renderer.toneMapping =
-    THREE.ACESFilmicToneMapping;
-
-renderer.toneMappingExposure = 1.0;
-
-container.appendChild(
-    renderer.domElement
-);
+container.appendChild(renderer.domElement);
 
 // ============================================================
 // LIGHTING
 // ============================================================
 
-// ------------------------------------------------------------
-// HEMISPHERE LIGHT
-// ------------------------------------------------------------
-
 const hemisphereLight =
     new THREE.HemisphereLight(
-        0xddeeff,
-        0x34452f,
-        1.5
+        0xc8e5ff,
+        0x40513a,
+        1.8
     );
 
-scene.add(
-    hemisphereLight
-);
-
-// ------------------------------------------------------------
-// SUN
-// ------------------------------------------------------------
+scene.add(hemisphereLight);
 
 const sun =
     new THREE.DirectionalLight(
-        0xffffff,
-        2.5
+        0xfff2d0,
+        2.2
     );
 
 sun.position.set(
-    300,
-    500,
-    200
+    -180,
+    250,
+    120
 );
 
 sun.castShadow = true;
 
-// ------------------------------------------------------------
-// SUN SHADOW SETTINGS
-// ------------------------------------------------------------
-
 sun.shadow.mapSize.width = 2048;
 sun.shadow.mapSize.height = 2048;
 
-sun.shadow.camera.left = -500;
-sun.shadow.camera.right = 500;
-sun.shadow.camera.top = 500;
-sun.shadow.camera.bottom = -500;
+sun.shadow.camera.left = -350;
+sun.shadow.camera.right = 350;
+sun.shadow.camera.top = 350;
+sun.shadow.camera.bottom = -350;
 
 sun.shadow.camera.near = 1;
-sun.shadow.camera.far = 1500;
+sun.shadow.camera.far = 800;
 
-scene.add(
-    sun
-);
+scene.add(sun);
 
 // ============================================================
-// TERRAIN
-// ============================================================
-
-let terrain = null;
-
-try {
-
-    terrain = new VeyraTerrain(
-        scene
-    );
-
-    console.log(
-        "Terrain: READY"
-    );
-
-} catch (error) {
-
-    console.error(
-        "Terrain creation failed:",
-        error
-    );
-}
-
-// ============================================================
-// WATER
-// ============================================================
-
-let water = null;
-
-try {
-
-    water = new VeyraWater(
-        scene
-    );
-
-    console.log(
-        "Water: READY"
-    );
-
-} catch (error) {
-
-    console.error(
-        "Water creation failed:",
-        error
-    );
-}
-
-// ============================================================
-// ENVIRONMENT
-// ============================================================
-
-let environment = null;
-
-if (terrain) {
-
-    try {
-
-        environment =
-            new VeyraEnvironment(
-                scene,
-                terrain
-            );
-
-        console.log(
-            "Environment: READY"
-        );
-
-    } catch (error) {
-
-        console.error(
-            "Environment creation failed:",
-            error
-        );
-    }
-}
-
-// ============================================================
-// LOADING SYSTEM
-// ============================================================
-
-function setLoading(
-    progress,
-    message
-) {
-
-    if (loadingProgress) {
-
-        loadingProgress.style.width =
-            progress + "%";
-    }
-
-    if (loadingText) {
-
-        loadingText.textContent =
-            message;
-    }
-}
-
-// ============================================================
-// LOADING SEQUENCE
+// WORLD
 // ============================================================
 
 setLoading(
-    5,
-    "Starting WILD ISLES..."
+    20,
+    "Creating Veyra Island..."
 );
 
-setTimeout(() => {
+const terrain =
+    new VeyraTerrain(scene);
 
-    setLoading(
-        20,
-        "Initializing graphics..."
+setLoading(
+    40,
+    "Creating ocean..."
+);
+
+const water =
+    new VeyraWater(scene);
+
+setLoading(
+    60,
+    "Growing environment..."
+);
+
+const environment =
+    new VeyraEnvironment(
+        scene,
+        terrain
     );
-
-}, 200);
-
-setTimeout(() => {
-
-    setLoading(
-        35,
-        "Preparing Veyra Island..."
-    );
-
-}, 400);
-
-setTimeout(() => {
-
-    setLoading(
-        50,
-        "Generating terrain..."
-    );
-
-}, 600);
-
-setTimeout(() => {
-
-    setLoading(
-        65,
-        "Creating coastline..."
-    );
-
-}, 800);
-
-setTimeout(() => {
-
-    setLoading(
-        78,
-        "Generating ocean..."
-    );
-
-}, 1000);
-
-setTimeout(() => {
-
-    setLoading(
-        88,
-        "Growing forest..."
-    );
-
-}, 1200);
-
-setTimeout(() => {
-
-    setLoading(
-        96,
-        "Placing rocks and grass..."
-    );
-
-}, 1400);
-
-setTimeout(() => {
-
-    setLoading(
-        100,
-        "Veyra Island ready."
-    );
-
-}, 1600);
-
-setTimeout(() => {
-
-    if (loadingScreen) {
-
-        loadingScreen.classList.add(
-            "hidden"
-        );
-    }
-
-}, 2000);
 
 // ============================================================
-// WINDOW RESIZE
+// PLAYER
+// ============================================================
+
+setLoading(
+    80,
+    "Preparing Kian..."
+);
+
+const player =
+    new Player(
+        scene,
+        terrain
+    );
+
+// ============================================================
+// CAMERA SETTINGS
+// ============================================================
+
+const cameraOffset =
+    new THREE.Vector3(
+        0,
+        5,
+        9
+    );
+
+const cameraTarget =
+    new THREE.Vector3();
+
+function updateCamera(delta) {
+
+    const playerPosition =
+        player.getPosition();
+
+    cameraTarget.set(
+        playerPosition.x,
+        playerPosition.y + 1.2,
+        playerPosition.z
+    );
+
+    const desiredPosition =
+        new THREE.Vector3(
+            playerPosition.x +
+            cameraOffset.x,
+
+            playerPosition.y +
+            cameraOffset.y,
+
+            playerPosition.z +
+            cameraOffset.z
+        );
+
+    camera.position.lerp(
+        desiredPosition,
+        Math.min(
+            1,
+            delta * 5
+        )
+    );
+
+    camera.lookAt(
+        cameraTarget
+    );
+}
+
+// ============================================================
+// RESIZE
 // ============================================================
 
 window.addEventListener(
     "resize",
     () => {
 
-        const width =
-            window.innerWidth;
-
-        const height =
-            window.innerHeight;
-
         camera.aspect =
-            width / height;
+            window.innerWidth /
+            window.innerHeight;
 
         camera.updateProjectionMatrix();
 
         renderer.setSize(
-            width,
-            height
+            window.innerWidth,
+            window.innerHeight
         );
 
         renderer.setPixelRatio(
             Math.min(
-                window.devicePixelRatio || 1,
+                window.devicePixelRatio,
                 1.5
             )
         );
@@ -391,41 +282,7 @@ const clock =
     new THREE.Clock();
 
 // ============================================================
-// WORLD UPDATE
-// ============================================================
-
-function updateWorld(
-    delta,
-    elapsedTime
-) {
-
-    if (water) {
-
-        water.update(
-            delta,
-            elapsedTime
-        );
-    }
-
-    if (environment) {
-
-        environment.update(
-            delta,
-            elapsedTime
-        );
-    }
-
-    // Future systems:
-    //
-    // weather.update(delta);
-    // dayNight.update(delta);
-    // wildlife.update(delta);
-    // infrastructure.update(delta);
-    // worldEvents.update(delta);
-}
-
-// ============================================================
-// MAIN GAME LOOP
+// GAME LOOP
 // ============================================================
 
 function animate() {
@@ -435,16 +292,33 @@ function animate() {
     );
 
     const delta =
-        clock.getDelta();
+        Math.min(
+            clock.getDelta(),
+            0.05
+        );
 
     const elapsedTime =
         clock.elapsedTime;
 
-    updateWorld(
+    // Player
+    player.update(delta);
+
+    // Environment
+    environment.update(
         delta,
         elapsedTime
     );
 
+    // Water
+    water.update(
+        delta,
+        elapsedTime
+    );
+
+    // Camera
+    updateCamera(delta);
+
+    // Render
     renderer.render(
         scene,
         camera
@@ -452,62 +326,30 @@ function animate() {
 }
 
 // ============================================================
-// START GAME LOOP
+// START
 // ============================================================
+
+setLoading(
+    100,
+    "WILD ISLES READY"
+);
+
+setTimeout(
+    () => {
+
+        if (loadingScreen) {
+
+            loadingScreen.classList.add(
+                "hidden"
+            );
+        }
+
+    },
+    700
+);
 
 animate();
 
-// ============================================================
-// DEBUG INFORMATION
-// ============================================================
-
 console.log(
-    "======================================"
-);
-
-console.log(
-    "          WILD ISLES"
-);
-
-console.log(
-    "          VEYRA ISLAND"
-);
-
-console.log(
-    "       WORLD FOUNDATION v0.3"
-);
-
-console.log(
-    "======================================"
-);
-
-console.log(
-    "Three.js Engine: READY"
-);
-
-console.log(
-    "Renderer: READY"
-);
-
-console.log(
-    "Lighting: READY"
-);
-
-console.log(
-    "Terrain: " +
-    (terrain ? "READY" : "FAILED")
-);
-
-console.log(
-    "Water: " +
-    (water ? "READY" : "FAILED")
-);
-
-console.log(
-    "Environment: " +
-    (environment ? "READY" : "FAILED")
-);
-
-console.log(
-    "======================================"
+    "WILD ISLES: GAME STARTED"
 );
