@@ -1,11 +1,12 @@
 // ============================================================
 // WILD ISLES
 // PLAYER SYSTEM
-// KIAN - HUGE WORLD MOVEMENT
-// Version 1.0
+// KIAN - HUGE WORLD MOVEMENT & REALISTIC PHYSICS
+// Version 2.0 (Full Feature & Realistic Mechanics)
 // ============================================================
 
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
+import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/loaders/GLTFLoader.js";
 
 export class Player {
 
@@ -34,6 +35,10 @@ export class Player {
         this.gravity = 25.0;
 
         this.maxSlope = 38;
+
+        // Smooth rotation & lean tracking
+        this.targetRotation = Math.PI;
+        this.currentRotation = Math.PI;
 
         // ====================================================
         // HUGE WORLD
@@ -88,12 +93,15 @@ export class Player {
         this.airControl = 0.65;
 
         // ====================================================
-        // ANIMATION
+        // ANIMATION & MIXER
         // ====================================================
 
         this.animationTime = 0;
 
         this.currentAnimation = "idle";
+
+        this.mixer = null;
+        this.actions = {};
 
         // ====================================================
         // PLAYER OBJECT
@@ -124,12 +132,12 @@ export class Player {
         this.spawnPlayer();
 
         console.log(
-            "KIAN Player v1.0 HUGE WORLD READY"
+            "KIAN Player v2.0 REALISTIC HUGE WORLD READY"
         );
     }
 
     // ========================================================
-    // CREATE PLAYER MODEL
+    // CREATE PLAYER MODEL (REALISTIC PROCEDURAL + ACCESSORIES)
     // ========================================================
 
     createPlayerModel() {
@@ -146,61 +154,41 @@ export class Player {
 
         const skinMaterial =
             new THREE.MeshStandardMaterial({
-
                 color: 0xc58d6d,
-
                 roughness: 0.82,
-
                 metalness: 0.02
-
             });
 
         const shirtMaterial =
             new THREE.MeshStandardMaterial({
-
                 color: 0x28343d,
-
                 roughness: 0.85,
-
                 metalness: 0.05
-
             });
 
         const pantsMaterial =
             new THREE.MeshStandardMaterial({
-
                 color: 0x171b20,
-
                 roughness: 0.9,
-
                 metalness: 0.02
-
             });
 
         const bootMaterial =
             new THREE.MeshStandardMaterial({
-
                 color: 0x090b0d,
-
                 roughness: 0.9,
-
                 metalness: 0.08
-
             });
 
         const gearMaterial =
             new THREE.MeshStandardMaterial({
-
                 color: 0x38454b,
-
                 roughness: 0.75,
-
                 metalness: 0.18
-
             });
 
         // ----------------------------------------------------
-        // BODY
+        // BODY / TORSO
         // ----------------------------------------------------
 
         const bodyGeometry =
@@ -220,7 +208,6 @@ export class Player {
             1.85;
 
         this.body.castShadow = true;
-
         this.body.receiveShadow = true;
 
         this.bodyGroup.add(
@@ -270,11 +257,8 @@ export class Player {
 
         const hairMaterial =
             new THREE.MeshStandardMaterial({
-
                 color: 0x151313,
-
                 roughness: 0.9
-
             });
 
         this.hair =
@@ -299,7 +283,22 @@ export class Player {
         );
 
         // ----------------------------------------------------
-        // LEFT ARM
+        // HELPER METHOD FOR PIVOTED LIMBS (REALISTIC ROTATION)
+        // ----------------------------------------------------
+        const createPivotLimb = (geometry, material, pos, offset) => {
+            const pivot = new THREE.Group();
+            pivot.position.copy(pos);
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.position.copy(offset);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            pivot.add(mesh);
+            this.bodyGroup.add(pivot);
+            return { pivot, mesh };
+        };
+
+        // ----------------------------------------------------
+        // ARMS (WITH SHOULDER PIVOTS)
         // ----------------------------------------------------
 
         const armGeometry =
@@ -309,54 +308,18 @@ export class Player {
                 0.34
             );
 
-        this.leftArm =
-            new THREE.Mesh(
-                armGeometry,
-                shirtMaterial
-            );
+        const lArm = createPivotLimb(armGeometry, shirtMaterial, new THREE.Vector3(-0.68, 2.45, 0), new THREE.Vector3(0, -0.55, 0));
+        this.leftArmPivot = lArm.pivot;
+        this.leftArm = lArm.mesh;
+        this.leftArmPivot.rotation.z = -0.08;
 
-        this.leftArm.position.set(
-            -0.68,
-            1.9,
-            0
-        );
-
-        this.leftArm.rotation.z =
-            -0.08;
-
-        this.leftArm.castShadow = true;
-
-        this.bodyGroup.add(
-            this.leftArm
-        );
+        const rArm = createPivotLimb(armGeometry, shirtMaterial, new THREE.Vector3(0.68, 2.45, 0), new THREE.Vector3(0, -0.55, 0));
+        this.rightArmPivot = rArm.pivot;
+        this.rightArm = rArm.mesh;
+        this.rightArmPivot.rotation.z = 0.08;
 
         // ----------------------------------------------------
-        // RIGHT ARM
-        // ----------------------------------------------------
-
-        this.rightArm =
-            new THREE.Mesh(
-                armGeometry,
-                shirtMaterial
-            );
-
-        this.rightArm.position.set(
-            0.68,
-            1.9,
-            0
-        );
-
-        this.rightArm.rotation.z =
-            0.08;
-
-        this.rightArm.castShadow = true;
-
-        this.bodyGroup.add(
-            this.rightArm
-        );
-
-        // ----------------------------------------------------
-        // LEFT LEG
+        // LEGS & BOOTS (WITH HIP PIVOTS)
         // ----------------------------------------------------
 
         const legGeometry =
@@ -366,50 +329,6 @@ export class Player {
                 0.42
             );
 
-        this.leftLeg =
-            new THREE.Mesh(
-                legGeometry,
-                pantsMaterial
-            );
-
-        this.leftLeg.position.set(
-            -0.25,
-            0.65,
-            0
-        );
-
-        this.leftLeg.castShadow = true;
-
-        this.bodyGroup.add(
-            this.leftLeg
-        );
-
-        // ----------------------------------------------------
-        // RIGHT LEG
-        // ----------------------------------------------------
-
-        this.rightLeg =
-            new THREE.Mesh(
-                legGeometry,
-                pantsMaterial
-            );
-
-        this.rightLeg.position.set(
-            0.25,
-            0.65,
-            0
-        );
-
-        this.rightLeg.castShadow = true;
-
-        this.bodyGroup.add(
-            this.rightLeg
-        );
-
-        // ----------------------------------------------------
-        // LEFT BOOT
-        // ----------------------------------------------------
-
         const bootGeometry =
             new THREE.BoxGeometry(
                 0.44,
@@ -417,45 +336,25 @@ export class Player {
                 0.62
             );
 
-        this.leftBoot =
-            new THREE.Mesh(
-                bootGeometry,
-                bootMaterial
-            );
+        // Left Leg + Boot
+        const lLeg = createPivotLimb(legGeometry, pantsMaterial, new THREE.Vector3(-0.25, 1.2, 0), new THREE.Vector3(0, -0.55, 0));
+        this.leftLegPivot = lLeg.pivot;
+        this.leftLeg = lLeg.mesh;
 
-        this.leftBoot.position.set(
-            -0.25,
-            0.08,
-            -0.08
-        );
-
+        this.leftBoot = new THREE.Mesh(bootGeometry, bootMaterial);
+        this.leftBoot.position.set(0, -1.12, -0.08);
         this.leftBoot.castShadow = true;
+        this.leftLegPivot.add(this.leftBoot);
 
-        this.bodyGroup.add(
-            this.leftBoot
-        );
+        // Right Leg + Boot
+        const rLeg = createPivotLimb(legGeometry, pantsMaterial, new THREE.Vector3(0.25, 1.2, 0), new THREE.Vector3(0, -0.55, 0));
+        this.rightLegPivot = rLeg.pivot;
+        this.rightLeg = rLeg.mesh;
 
-        // ----------------------------------------------------
-        // RIGHT BOOT
-        // ----------------------------------------------------
-
-        this.rightBoot =
-            new THREE.Mesh(
-                bootGeometry,
-                bootMaterial
-            );
-
-        this.rightBoot.position.set(
-            0.25,
-            0.08,
-            -0.08
-        );
-
+        this.rightBoot = new THREE.Mesh(bootGeometry, bootMaterial);
+        this.rightBoot.position.set(0, -1.12, -0.08);
         this.rightBoot.castShadow = true;
-
-        this.bodyGroup.add(
-            this.rightBoot
-        );
+        this.rightLegPivot.add(this.rightBoot);
 
         // ----------------------------------------------------
         // BACKPACK
@@ -564,6 +463,37 @@ export class Player {
     }
 
     // ========================================================
+    // EXTERNAL GLTF MODEL LOADER (3D Realistic Models)
+    // ========================================================
+
+    loadCharacterModel(modelUrl) {
+        const loader = new GLTFLoader();
+        loader.load(modelUrl, (gltf) => {
+            while (this.bodyGroup.children.length > 0) {
+                this.bodyGroup.remove(this.bodyGroup.children[0]);
+            }
+
+            const model = gltf.scene;
+            model.scale.set(1.25, 1.25, 1.25);
+            model.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                }
+            });
+
+            this.bodyGroup.add(model);
+
+            if (gltf.animations && gltf.animations.length) {
+                this.mixer = new THREE.AnimationMixer(model);
+                gltf.animations.forEach((clip) => {
+                    this.actions[clip.name.toLowerCase()] = this.mixer.clipAction(clip);
+                });
+            }
+        });
+    }
+
+    // ========================================================
     // KEYBOARD
     // ========================================================
 
@@ -575,7 +505,6 @@ export class Player {
 
                 this.keys[event.code] = true;
 
-                // Prevent page scrolling
                 if (
                     event.code === "Space" ||
                     event.code === "ArrowUp" ||
@@ -888,10 +817,6 @@ export class Player {
             currentZ +
             deltaZ;
 
-        // ----------------------------------------------------
-        // HUGE WORLD BOUNDARY
-        // ----------------------------------------------------
-
         if (
             this.terrain &&
             typeof this.terrain.isInsideWorld ===
@@ -924,10 +849,6 @@ export class Player {
 
         }
 
-        // ----------------------------------------------------
-        // FULL MOVEMENT
-        // ----------------------------------------------------
-
         if (
             this.isSafePosition(
                 targetX,
@@ -945,10 +866,6 @@ export class Player {
 
         }
 
-        // ----------------------------------------------------
-        // X SLIDE
-        // ----------------------------------------------------
-
         if (
             this.isSafePosition(
                 targetX,
@@ -962,10 +879,6 @@ export class Player {
             return true;
 
         }
-
-        // ----------------------------------------------------
-        // Z SLIDE
-        // ----------------------------------------------------
 
         if (
             this.isSafePosition(
@@ -1118,10 +1031,6 @@ export class Player {
         let inputX = 0;
 
         let inputZ = 0;
-
-        // ----------------------------------------------------
-        // KEEP EXISTING CONTROLS
-        // ----------------------------------------------------
 
         if (
             this.keys["KeyW"] ||
@@ -1312,7 +1221,7 @@ export class Player {
         }
 
         // ----------------------------------------------------
-        // MOVEMENT
+        // MOVEMENT & REALISTIC ROTATION / LEANING
         // ----------------------------------------------------
 
         if (
@@ -1347,7 +1256,23 @@ export class Player {
                 moveZ
             );
 
+            // Realistic rotation target angle
+            this.targetRotation = Math.atan2(movement.x, movement.z);
+
         }
+
+        // Smooth Interpolation of Player Rotation Angle
+        let diff = this.targetRotation - this.currentRotation;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        
+        this.currentRotation += diff * 10 * deltaTime;
+        this.object.rotation.y = this.currentRotation;
+
+        // Realistic Body Leaning/Tilting while turning and moving
+        const turnTilt = diff;
+        this.bodyGroup.rotation.z = THREE.MathUtils.lerp(this.bodyGroup.rotation.z, -turnTilt * 0.18, 8 * deltaTime);
+        this.bodyGroup.rotation.x = THREE.MathUtils.lerp(this.bodyGroup.rotation.x, input.moving ? 0.09 : 0, 8 * deltaTime);
 
         // ----------------------------------------------------
         // GRAVITY
@@ -1369,7 +1294,6 @@ export class Player {
                 currentZ
             );
 
-        // Player feet position
         const targetY =
             groundY;
 
@@ -1453,10 +1377,14 @@ export class Player {
         // ANIMATION
         // ----------------------------------------------------
 
-        this.updateAnimation(
-            deltaTime,
-            input.moving
-        );
+        if (this.mixer) {
+            this.mixer.update(deltaTime);
+        } else {
+            this.updateAnimation(
+                deltaTime,
+                input.moving
+            );
+        }
 
         // ----------------------------------------------------
         // CHUNK STREAMING
@@ -1506,17 +1434,10 @@ export class Player {
             this.bodyGroup.position.y =
                 idle;
 
-            this.leftArm.rotation.x *=
-                0.88;
-
-            this.rightArm.rotation.x *=
-                0.88;
-
-            this.leftLeg.rotation.x *=
-                0.88;
-
-            this.rightLeg.rotation.x *=
-                0.88;
+            if (this.leftArmPivot) this.leftArmPivot.rotation.x *= 0.88;
+            if (this.rightArmPivot) this.rightArmPivot.rotation.x *= 0.88;
+            if (this.leftLegPivot) this.leftLegPivot.rotation.x *= 0.88;
+            if (this.rightLegPivot) this.rightLegPivot.rotation.x *= 0.88;
 
             return;
 
@@ -1557,249 +1478,14 @@ export class Player {
                 ? 0.85
                 : 0.55;
 
-        this.leftArm.rotation.x =
-            swing *
-            armAmount;
-
-        this.rightArm.rotation.x =
-            -swing *
-            armAmount;
-
-        this.leftLeg.rotation.x =
-            -swing *
-            legAmount;
-
-        this.rightLeg.rotation.x =
-            swing *
-            legAmount;
-
-        this.bodyGroup.position.y =
-            Math.abs(
-                swing
-            ) *
-            (
-                this.isRunning
-                    ? 0.045
-                    : 0.025
-            );
-
-    }
-
-    // ========================================================
-    // TELEPORT
-    // ========================================================
-
-    teleport(
-        x,
-        y,
-        z
-    ) {
-
-        if (
-            !Number.isFinite(x) ||
-            !Number.isFinite(y) ||
-            !Number.isFinite(z)
-        ) {
-
-            return false;
-
-        }
-
-        if (
-            this.terrain &&
-            typeof this.terrain.isInsideWorld ===
-            "function"
-        ) {
-
-            if (
-                !this.terrain.isInsideWorld(
-                    x,
-                    z
-                )
-            ) {
-
-                return false;
-
-            }
-
-        }
-
-        this.object.position.set(
-            x,
-            y,
-            z
-        );
-
-        this.velocity.set(
-            0,
-            0,
-            0
-        );
-
-        this.isGrounded =
-            false;
-
-        this.isJumping =
-            false;
-
-        return true;
-
-    }
-
-    // ========================================================
-    // POSITION
-    // ========================================================
-
-    getPosition() {
-
-        return {
-
-            x:
-                this.object.position.x,
-
-            y:
-                this.object.position.y,
-
-            z:
-                this.object.position.z
-
-        };
-
-    }
-
-    // ========================================================
-    // OBJECT
-    // ========================================================
-
-    getObject() {
-
-        return this.object;
-
-    }
-
-    // ========================================================
-    // DEBUG
-    // ========================================================
-
-    getDebugInfo() {
-
-        const position =
-            this.getPosition();
-
-        let slope = 0;
-
-        let ground = 0;
-
-        if (
-            this.terrain
-        ) {
-
-            ground =
-                this.getGroundHeight(
-                    position.x,
-                    position.z
-                );
-
-            if (
-                typeof this.terrain.getSlopeDegrees ===
-                "function"
-            ) {
-
-                slope =
-                    this.terrain.getSlopeDegrees(
-                        position.x,
-                        position.z
-                    );
-
-            }
-
-        }
-
-        return {
-
-            name:
-                this.name,
-
-            x:
-                position.x.toFixed(2),
-
-            y:
-                position.y.toFixed(2),
-
-            z:
-                position.z.toFixed(2),
-
-            ground:
-                ground.toFixed(2),
-
-            slope:
-                slope.toFixed(1),
-
-            grounded:
-                this.isGrounded,
-
-            jumping:
-                this.isJumping,
-
-            running:
-                this.isRunning,
-
-            crouching:
-                this.isCrouching,
-
-            stamina:
-                Math.round(
-                    this.stamina
-                ),
-
-            animation:
-                this.currentAnimation
-
-        };
-
-    }
-
-    // ========================================================
-    // DISPOSE
-    // ========================================================
-
-    dispose() {
-
-        window.removeEventListener(
-            "keydown",
-            this.handleKeyDown
-        );
-
-        window.removeEventListener(
-            "keyup",
-            this.handleKeyUp
-        );
-
-        if (
-            this.scene &&
-            this.object
-        ) {
-
-            this.scene.remove(
-                this.object
-            );
-
-        }
-
-        this.scene = null;
-
-        this.terrain = null;
-
-        this.object = null;
-
-        this.bodyGroup = null;
-
-        this.velocity = null;
+        if (this.leftArmPivot) this.leftArmPivot.rotation.x = swing * armAmount;
+        if (this.rightArmPivot) this.rightArmPivot.rotation.x = -swing * armAmount;
+        if (this.leftLegPivot) this.leftLegPivot.rotation.x = -swing * legAmount;
+        if (this.rightLegPivot) this.rightLegPivot.rotation.x = swing * legAmount;
+
+        // Step Bounce Effect
+        this.bodyGroup.position.y = Math.abs(swing) * 0.05;
 
     }
 
 }
-
-// ============================================================
-// END OF KIAN PLAYER SYSTEM
-// ============================================================
