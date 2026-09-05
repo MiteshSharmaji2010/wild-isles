@@ -162,7 +162,6 @@ class WildIslesGame {
         // --------------------------------------------------------
 
         this.tempVector = new THREE.Vector3();
-
         this.tempVector2 = new THREE.Vector3();
 
         // --------------------------------------------------------
@@ -519,81 +518,64 @@ class WildIslesGame {
         console.log("Lighting READY");
     }
 
-  // ============================================================
-// TERRAIN
-// ============================================================
+    // ============================================================
+    // TERRAIN
+    // ============================================================
 
-createTerrain() {
+    createTerrain() {
 
-    this.terrain =
-        new VeyraTerrain(
-            this.scene
+        this.terrain =
+            new VeyraTerrain(
+                this.scene
+            );
+
+        if (
+            this.terrain &&
+            typeof this.terrain.getSlopeDegrees !== "function" &&
+            typeof this.terrain.getSlopeAngleDegrees === "function"
+        ) {
+
+            this.terrain.getSlopeDegrees =
+                (x, z) => {
+
+                    return this.terrain.getSlopeAngleDegrees(
+                        x,
+                        z
+                    );
+                };
+        }
+
+        if (
+            this.terrain &&
+            typeof this.terrain.enable === "function"
+        ) {
+
+            this.terrain.enable();
+        }
+
+        if (
+            this.terrain &&
+            typeof this.terrain.update === "function"
+        ) {
+
+            this.terrain.update(
+                0,
+                0
+            );
+        }
+
+        console.log(
+            "Veyra Terrain READY"
         );
 
-    // --------------------------------------------------------
-    // TERRAIN COMPATIBILITY
-    // --------------------------------------------------------
-    // environment.js uses getSlopeDegrees()
-    // terrain.js provides getSlopeAngleDegrees()
-    //
-    // Keep both names available so older systems
-    // remain compatible.
-    // --------------------------------------------------------
-
-    if (
-        this.terrain &&
-        typeof this.terrain.getSlopeDegrees !== "function" &&
-        typeof this.terrain.getSlopeAngleDegrees === "function"
-    ) {
-
-        this.terrain.getSlopeDegrees =
-            (x, z) => {
-
-                return this.terrain.getSlopeAngleDegrees(
-                    x,
-                    z
-                );
-            };
-    }
-
-    // --------------------------------------------------------
-    // ENABLE TERRAIN STREAMING
-    // --------------------------------------------------------
-
-    if (
-        this.terrain &&
-        typeof this.terrain.enable === "function"
-    ) {
-
-        this.terrain.enable();
-    }
-
-    // --------------------------------------------------------
-    // INITIAL TERRAIN CHUNKS
-    // --------------------------------------------------------
-
-    if (
-        this.terrain &&
-        typeof this.terrain.update === "function"
-    ) {
-
-        this.terrain.update(
-            0,
-            0
+        console.log(
+            "Terrain Slope API:",
+            typeof this.terrain.getSlopeDegrees === "function"
+                ? "READY"
+                : "MISSING"
         );
     }
 
-    console.log(
-        "Veyra Terrain READY"
-    );
-
-    console.log(
-        "Terrain Slope API:",
-        typeof this.terrain.getSlopeDegrees === "function"
-            ? "READY"
-            : "MISSING"
-    );
-}
     // ============================================================
     // WATER
     // ============================================================
@@ -1366,895 +1348,153 @@ createTerrain() {
             this.animate
         );
 
-        console.log(
-            "================================"
-        );
-
-        console.log(
-            "WILD ISLES STARTED"
-        );
-
-        console.log(
-            "VEYRA WORLD ONLINE"
-        );
-
-        console.log(
-            "================================"
-        );
+        console.log("WILD ISLES GAME ENGINE STARTED");
     }
 
     // ============================================================
-    // GAME LOOP
+    // MAIN GAME LOOP
     // ============================================================
 
     animate() {
 
-        requestAnimationFrame(
-            this.animate
-        );
+        requestAnimationFrame(this.animate);
 
-        if (!this.started)
-            return;
+        if (this.paused || this.fatalError) return;
 
-        if (this.fatalError)
-            return;
+        this.deltaTime = Math.min(this.clock.getDelta(), 0.1);
+        this.elapsedTime = this.clock.getElapsedTime();
 
-        this.deltaTime =
-            this.clock.getDelta();
+        this.updateInput();
+        this.updateGame(this.deltaTime, this.elapsedTime);
+        this.updateCamera();
+        this.render();
+    }
 
-        this.deltaTime =
-            Math.min(
-                this.deltaTime,
-                0.1
-            );
+    // ============================================================
+    // INPUT UPDATE
+    // ============================================================
 
-        this.elapsedTime +=
-            this.deltaTime;
+    updateInput() {
 
-        if (this.paused) {
+        if (!this.player) return;
 
-            this.render();
+        let moveForward = 0;
+        let moveSide = 0;
+        let isRunning = false;
 
-            return;
+        if (this.keys["KeyW"] || this.keys["ArrowUp"]) moveForward += 1;
+        if (this.keys["KeyS"] || this.keys["ArrowDown"]) moveForward -= 1;
+        if (this.keys["KeyA"] || this.keys["ArrowLeft"]) moveSide -= 1;
+        if (this.keys["KeyD"] || this.keys["ArrowRight"]) moveSide += 1;
+
+        if (this.keys["ShiftLeft"] || this.keys["ShiftRight"]) {
+            isRunning = true;
         }
 
-        try {
+        if (this.mobile && this.joystickActive) {
+            moveForward = -this.joystickY;
+            moveSide = this.joystickX;
+            if (this.mobileRunning) isRunning = true;
+        }
 
-            this.update(
-                this.deltaTime,
-                this.elapsedTime
-            );
+        if (typeof this.player.move === "function") {
+            this.player.move(moveForward, moveSide, isRunning, this.deltaTime);
+        }
 
-            this.render();
-
-        } catch (error) {
-
-            console.error(
-                "GAME LOOP ERROR:",
-                error
-            );
-
-            this.fatalError = true;
-
-            this.showFatalError(
-                error
-            );
+        if (this.keys["Space"]) {
+            if (typeof this.player.jump === "function") {
+                this.player.jump();
+            }
         }
     }
 
     // ============================================================
-    // UPDATE
+    // GAME ENGINE UPDATE
     // ============================================================
 
-    update(
-        deltaTime,
-        elapsedTime
-    ) {
+    updateGame(delta, elapsedTime) {
 
-        this.updatePlayer(
-            deltaTime
-        );
+        if (this.player && typeof this.player.update === "function") {
+            this.player.update(delta);
+        }
 
-        this.updateTerrainStreaming();
+        if (this.player && this.terrain) {
+            const playerPos = typeof this.player.getPosition === "function" 
+                ? this.player.getPosition() 
+                : this.player.position;
 
-        this.updateWorldSystems(
-            deltaTime,
-            elapsedTime
-        );
+            if (playerPos) {
+                this.currentChunkX = Math.floor(playerPos.x / this.chunkSize);
+                this.currentChunkZ = Math.floor(playerPos.z / this.chunkSize);
 
-        this.updateCamera();
+                if (this.currentChunkX !== this.lastChunkX || this.currentChunkZ !== this.lastChunkZ) {
+                    if (typeof this.terrain.update === "function") {
+                        this.terrain.update(playerPos.x, playerPos.z);
+                    }
+                    this.lastChunkX = this.currentChunkX;
+                    this.lastChunkZ = this.currentChunkZ;
+                }
+            }
+        }
 
-        this.updateWorldTime();
+        if (this.water && typeof this.water.update === "function") {
+            this.water.update(elapsedTime, delta);
+        }
+
+        if (this.environment && typeof this.environment.update === "function") {
+            const playerPos = this.player && typeof this.player.getPosition === "function" 
+                ? this.player.getPosition() 
+                : null;
+            this.environment.update(delta, playerPos);
+        }
+
+        if (this.survival && typeof this.survival.update === "function") {
+            this.survival.update(delta);
+        }
+
+        if (this.dayNight && typeof this.dayNight.update === "function") {
+            this.dayNight.update(delta);
+        }
 
         this.updatePlayerUI();
-
         this.updateWorldUI();
-
         this.updateDebugUI();
     }
 
     // ============================================================
-    // PLAYER UPDATE
-    // ============================================================
-
-    updatePlayer(deltaTime) {
-
-        if (!this.player)
-            return;
-
-        // --------------------------------------------------------
-        // MOBILE INPUT
-        // --------------------------------------------------------
-
-        if (this.mobile) {
-
-            const threshold =
-                0.12;
-
-            if (
-                Math.abs(this.joystickX) >
-                    threshold ||
-                Math.abs(this.joystickY) >
-                    threshold
-            ) {
-
-                if (!this.player.keys) {
-
-                    this.player.keys = {};
-                }
-
-                // Forward/back
-                if (
-                    this.joystickY <
-                    -threshold
-                ) {
-
-                    this.player.keys.KeyW =
-                        true;
-
-                    this.player.keys.KeyS =
-                        false;
-
-                } else if (
-                    this.joystickY >
-                    threshold
-                ) {
-
-                    this.player.keys.KeyS =
-                        true;
-
-                    this.player.keys.KeyW =
-                        false;
-
-                } else {
-
-                    this.player.keys.KeyW =
-                        false;
-
-                    this.player.keys.KeyS =
-                        false;
-                }
-
-                // Left/right
-                if (
-                    this.joystickX <
-                    -threshold
-                ) {
-
-                    this.player.keys.KeyA =
-                        true;
-
-                    this.player.keys.KeyD =
-                        false;
-
-                } else if (
-                    this.joystickX >
-                    threshold
-                ) {
-
-                    this.player.keys.KeyD =
-                        true;
-
-                    this.player.keys.KeyA =
-                        false;
-
-                } else {
-
-                    this.player.keys.KeyA =
-                        false;
-
-                    this.player.keys.KeyD =
-                        false;
-                }
-
-                if (
-                    this.mobileRunning
-                ) {
-
-                    this.player.keys.ShiftLeft =
-                        true;
-
-                } else {
-
-                    this.player.keys.ShiftLeft =
-                        false;
-                }
-
-            } else {
-
-                if (this.player.keys) {
-
-                    this.player.keys.KeyW =
-                        false;
-
-                    this.player.keys.KeyS =
-                        false;
-
-                    this.player.keys.KeyA =
-                        false;
-
-                    this.player.keys.KeyD =
-                        false;
-
-                    this.player.keys.ShiftLeft =
-                        false;
-                }
-            }
-        }
-
-        // --------------------------------------------------------
-        // PLAYER SYSTEM
-        // --------------------------------------------------------
-
-        if (
-            typeof this.player.update ===
-            "function"
-        ) {
-
-            this.player.update(
-                deltaTime
-            );
-        }
-    }
-
-    // ============================================================
-    // TERRAIN STREAMING
-    // ============================================================
-
-    updateTerrainStreaming() {
-
-        if (!this.terrain ||
-            !this.player)
-            return;
-
-        const position =
-            this.player.getPosition();
-
-        if (!position)
-            return;
-
-        // Terrain's own streaming system
-        if (
-            typeof this.terrain.update ===
-            "function"
-        ) {
-
-            this.terrain.update(
-                position.x,
-                position.z
-            );
-        }
-
-        const chunkX =
-            Math.floor(
-                position.x /
-                this.chunkSize
-            );
-
-        const chunkZ =
-            Math.floor(
-                position.z /
-                this.chunkSize
-            );
-
-        this.currentChunkX =
-            chunkX;
-
-        this.currentChunkZ =
-            chunkZ;
-
-        if (
-            chunkX !== this.lastChunkX ||
-            chunkZ !== this.lastChunkZ
-        ) {
-
-            this.lastChunkX =
-                chunkX;
-
-            this.lastChunkZ =
-                chunkZ;
-
-            this.onChunkChanged(
-                chunkX,
-                chunkZ
-            );
-        }
-    }
-
-    // ============================================================
-    // CHUNK CHANGE
-    // ============================================================
-
-    onChunkChanged(
-        chunkX,
-        chunkZ
-    ) {
-
-        console.log(
-            `WORLD CHUNK: ${chunkX}, ${chunkZ}`
-        );
-
-        // Environment streaming hook
-        if (
-            this.environment &&
-            typeof this.environment.update ===
-            "function"
-        ) {
-
-            this.environment.update(
-                this.deltaTime
-            );
-        }
-    }
-
-    // ============================================================
-    // WORLD SYSTEMS
-    // ============================================================
-
-    updateWorldSystems(
-        deltaTime,
-        elapsedTime
-    ) {
-
-        // --------------------------------------------------------
-        // WATER
-        // --------------------------------------------------------
-
-        if (
-            this.water &&
-            typeof this.water.update ===
-            "function"
-        ) {
-
-            this.water.update(
-                deltaTime,
-                elapsedTime
-            );
-        }
-
-        // --------------------------------------------------------
-        // ENVIRONMENT
-        // --------------------------------------------------------
-
-        if (
-            this.environment &&
-            typeof this.environment.update ===
-            "function"
-        ) {
-
-            this.environment.update(
-                deltaTime,
-                elapsedTime
-            );
-        }
-
-        // --------------------------------------------------------
-        // SURVIVAL
-        // --------------------------------------------------------
-
-        if (
-            this.survival &&
-            typeof this.survival.update ===
-            "function"
-        ) {
-
-            this.survival.update(
-                deltaTime,
-                elapsedTime
-            );
-        }
-
-        // --------------------------------------------------------
-        // DAY NIGHT
-        // --------------------------------------------------------
-
-        if (
-            this.dayNight &&
-            typeof this.dayNight.update ===
-            "function"
-        ) {
-
-            this.dayNight.update(
-                deltaTime
-            );
-        }
-    }
-
-    // ============================================================
-    // CAMERA
+    // CAMERA FOLLOW & ORBIT
     // ============================================================
 
     updateCamera() {
 
-        if (!this.camera ||
-            !this.player)
-            return;
+        if (!this.player || !this.camera) return;
 
-        const playerObject =
-            typeof this.player.getObject ===
-            "function"
-                ? this.player.getObject()
-                : null;
+        const playerPos = typeof this.player.getPosition === "function" 
+            ? this.player.getPosition() 
+            : this.player.position;
 
-        if (!playerObject)
-            return;
+        if (!playerPos) return;
 
-        const playerPosition =
-            this.player.getPosition();
+        this.cameraTarget.copy(playerPos).y += 1.6;
 
-        if (!playerPosition)
-            return;
+        const cx = this.cameraDistance * Math.sin(this.cameraYaw) * Math.cos(this.cameraPitch);
+        const cy = this.cameraDistance * Math.sin(-this.cameraPitch) + this.cameraHeight;
+        const cz = this.cameraDistance * Math.cos(this.cameraYaw) * Math.cos(this.cameraPitch);
 
-        this.cameraTarget.set(
-            playerPosition.x,
-            playerPosition.y + 1.7,
-            playerPosition.z
+        this.camera.position.set(
+            this.cameraTarget.x + cx,
+            this.cameraTarget.y + cy,
+            this.cameraTarget.z + cz
         );
 
-        const horizontal =
-            Math.cos(
-                this.cameraPitch
-            ) *
-            this.cameraDistance;
-
-        const vertical =
-            Math.sin(
-                this.cameraPitch
-            ) *
-            this.cameraDistance;
-
-        const offsetX =
-            Math.sin(
-                this.cameraYaw
-            ) *
-            horizontal;
-
-        const offsetZ =
-            Math.cos(
-                this.cameraYaw
-            ) *
-            horizontal;
-
-        const desiredPosition =
-            this.tempVector.set(
-                this.cameraTarget.x +
-                    offsetX,
-
-                this.cameraTarget.y -
-                    vertical +
-                    this.cameraHeight *
-                    0.15,
-
-                this.cameraTarget.z +
-                    offsetZ
-            );
-
-        const smoothing =
-            1 -
-            Math.pow(
-                0.001,
-                this.deltaTime
-            );
-
-        this.camera.position.lerp(
-            desiredPosition,
-            smoothing
-        );
-
-        this.camera.lookAt(
-            this.cameraTarget
-        );
-    }
-
-    // ============================================================
-    // WORLD TIME
-    // ============================================================
-
-    updateWorldTime() {
-
-        if (!this.dayNight)
-            return;
-
-        if (!this.worldTime)
-            return;
-
-        if (
-            typeof this.dayNight.getFormattedTime ===
-            "function"
-        ) {
-
-            this.worldTime.textContent =
-                this.dayNight.getFormattedTime();
-
-            return;
-        }
-
-        if (
-            typeof this.dayNight.getTime ===
-            "function"
-        ) {
-
-            const time =
-                this.dayNight.getTime();
-
-            if (time) {
-
-                this.worldTime.textContent =
-                    String(time);
-            }
-        }
-    }
-
-    // ============================================================
-    // WORLD UI
-    // ============================================================
-
-    updateWorldUI() {
-
-        if (this.worldLocation) {
-
-            let locationText =
-                "VEYRA ISLAND";
-
-            if (
-                this.terrain &&
-                this.player
-            ) {
-
-                const position =
-                    this.player.getPosition();
-
-                if (
-                    position &&
-                    typeof this.terrain.getBiome ===
-                    "function"
-                ) {
-
-                    const biome =
-                        this.terrain.getBiome(
-                            position.x,
-                            position.z
-                        );
-
-                    if (biome) {
-
-                        locationText =
-                            this.formatBiome(
-                                biome
-                            );
-                    }
-                }
-            }
-
-            this.worldLocation.textContent =
-                locationText.toUpperCase();
-        }
-    }
-
-    // ============================================================
-    // BIOME FORMAT
-    // ============================================================
-
-    formatBiome(
-        biome
-    ) {
-
-        const names = {
-
-            ocean:
-                "OPEN OCEAN",
-
-            coast:
-                "COASTAL REGION",
-
-            forest:
-                "GREENFALL FOREST",
-
-            grassland:
-                "VEYRA GRASSLAND",
-
-            highland:
-                "NORTHERN HIGHLANDS",
-
-            mountain:
-                "MOUNTAIN RANGE",
-
-            snow:
-                "FROST PEAK",
-
-            desert:
-                "ASHEN DESERT"
-        };
-
-        return (
-            names[biome] ||
-            "VEYRA ISLAND"
-        );
-    }
-
-    // ============================================================
-    // PLAYER UI
-    // ============================================================
-
-    updatePlayerUI() {
-
-        if (!this.player)
-            return;
-
-        const status =
-            this.survival &&
-            typeof this.survival.getStatus ===
-            "function"
-                ? this.survival.getStatus()
-                : null;
-
-        // --------------------------------------------------------
-        // HEALTH
-        // --------------------------------------------------------
-
-        let health =
-            status
-                ? status.health
-                : this.player.health;
-
-        const maxHealth =
-            status
-                ? 100
-                : (
-                    this.player.maxHealth ||
-                    100
-                );
-
-        health =
-            Number.isFinite(
-                Number(health)
-            )
-                ? Number(health)
-                : 100;
-
-        const healthPercent =
-            THREE.MathUtils.clamp(
-                health /
-                    Math.max(
-                        1,
-                        maxHealth
-                    ) *
-                    100,
-                0,
-                100
-            );
-
-        if (this.healthFill) {
-
-            this.healthFill.style.width =
-                `${healthPercent}%`;
-        }
-
-        // --------------------------------------------------------
-        // STAMINA
-        // --------------------------------------------------------
-
-        let stamina =
-            status
-                ? status.stamina
-                : this.player.stamina;
-
-        stamina =
-            Number.isFinite(
-                Number(stamina)
-            )
-                ? Number(stamina)
-                : 100;
-
-        const maxStamina =
-            this.player.maxStamina ||
-            100;
-
-        const staminaPercent =
-            THREE.MathUtils.clamp(
-                stamina /
-                    Math.max(
-                        1,
-                        maxStamina
-                    ) *
-                    100,
-                0,
-                100
-            );
-
-        if (this.staminaFill) {
-
-            this.staminaFill.style.width =
-                `${staminaPercent}%`;
-        }
-
-        // --------------------------------------------------------
-        // HUNGER
-        // --------------------------------------------------------
-
-        if (
-            this.hungerValue &&
-            status
-        ) {
-
-            this.hungerValue.textContent =
-                `${Math.round(
-                    status.hunger
-                )}%`;
-        }
-
-        // --------------------------------------------------------
-        // THIRST
-        // --------------------------------------------------------
-
-        if (
-            this.thirstValue &&
-            status
-        ) {
-
-            this.thirstValue.textContent =
-                `${Math.round(
-                    status.thirst
-                )}%`;
-        }
-
-        // --------------------------------------------------------
-        // TEMPERATURE
-        // --------------------------------------------------------
-
-        if (
-            this.temperatureValue &&
-            status
-        ) {
-
-            this.temperatureValue.textContent =
-                `${Math.round(
-                    status.temperature
-                )}%`;
-        }
-    }
-
-    // ============================================================
-    // DEBUG
-    // ============================================================
-
-    updateDebugUI() {
-
-        if (!this.debugInfo)
-            return;
-
-        if (!this.player) {
-
-            this.debugInfo.textContent =
-                "WILD ISLES";
-
-            return;
-        }
-
-        const position =
-            this.player.getPosition();
-
-        if (!position)
-            return;
-
-        const fps =
-            this.deltaTime > 0
-                ? Math.round(
-                    1 /
-                    this.deltaTime
-                )
-                : 60;
-
-        const chunkX =
-            Math.floor(
-                position.x /
-                this.chunkSize
-            );
-
-        const chunkZ =
-            Math.floor(
-                position.z /
-                this.chunkSize
-            );
-
-        let terrainText = "";
-
-        if (
-            this.terrain &&
-            typeof this.terrain.getTerrainInfo ===
-            "function"
-        ) {
-
-            try {
-
-                const info =
-                    this.terrain.getTerrainInfo(
-                        position.x,
-                        position.z
-                    );
-
-                if (info) {
-
-                    terrainText =
-                        `\nBIOME: ${
-                            info.biome ||
-                            "UNKNOWN"
-                        }`;
-                }
-
-            } catch (error) {
-
-                // Debug information should
-                // never stop the game.
+        if (this.terrain && typeof this.terrain.getHeight === "function") {
+            const terrainHeight = this.terrain.getHeight(this.camera.position.x, this.camera.position.z);
+            if (this.camera.position.y < terrainHeight + 0.5) {
+                this.camera.position.y = terrainHeight + 0.5;
             }
         }
 
-        this.debugInfo.textContent =
-            `FPS: ${fps}` +
-            `\nPOS: ${position.x.toFixed(1)}, ${position.y.toFixed(1)}, ${position.z.toFixed(1)}` +
-            `\nCHUNK: ${chunkX}, ${chunkZ}` +
-            terrainText;
-    }
-
-    // ============================================================
-    // INTERACTION
-    // ============================================================
-
-    showInteraction(
-        message,
-        duration = 1800
-    ) {
-
-        if (!this.interactionMessage)
-            return;
-
-        this.interactionMessage.textContent =
-            message;
-
-        this.interactionMessage.classList.add(
-            "show"
-        );
-
-        clearTimeout(
-            this.interactionTimer
-        );
-
-        this.interactionTimer =
-            setTimeout(
-                () => {
-
-                    if (
-                        this.interactionMessage
-                    ) {
-
-                        this.interactionMessage.classList.remove(
-                            "show"
-                        );
-                    }
-
-                },
-                duration
-            );
+        this.camera.lookAt(this.cameraTarget);
     }
 
     // ============================================================
@@ -2263,449 +1503,100 @@ createTerrain() {
 
     render() {
 
-        if (!this.renderer ||
-            !this.scene ||
-            !this.camera)
-            return;
-
-        this.renderer.render(
-            this.scene,
-            this.camera
-        );
+        if (this.renderer && this.scene && this.camera) {
+            this.renderer.render(this.scene, this.camera);
+        }
     }
 
     // ============================================================
-    // PAUSE
+    // UI UPDATES
     // ============================================================
 
-    pause() {
+    updatePlayerUI() {
 
-        this.paused = true;
-    }
+        if (!this.survival && !this.player) return;
 
-    // ============================================================
-    // RESUME
-    // ============================================================
-
-    resume() {
-
-        this.paused = false;
-
-        this.clock.start();
-    }
-
-    // ============================================================
-    // TELEPORT
-    // ============================================================
-
-    teleport(
-        x,
-        z
-    ) {
-
-        if (!this.player)
-            return false;
-
-        if (
-            typeof this.player.teleport !==
-            "function"
-        ) {
-
-            return false;
+        if (this.healthFill) {
+            const hp = this.survival && this.survival.health !== undefined ? this.survival.health : 100;
+            this.healthFill.style.width = `${hp}%`;
         }
 
-        let y = 5;
-
-        if (
-            this.terrain &&
-            typeof this.terrain.getSafeGroundHeight ===
-            "function"
-        ) {
-
-            y =
-                this.terrain.getSafeGroundHeight(
-                    x,
-                    z
-                );
+        if (this.staminaFill) {
+            const stamina = this.player && this.player.stamina !== undefined ? this.player.stamina : 100;
+            this.staminaFill.style.width = `${stamina}%`;
         }
 
-        this.player.teleport(
-            x,
-            y,
-            z
-        );
+        if (this.hungerValue && this.survival && this.survival.hunger !== undefined) {
+            this.hungerValue.textContent = `${Math.round(this.survival.hunger)}%`;
+        }
 
-        return true;
+        if (this.thirstValue && this.survival && this.survival.thirst !== undefined) {
+            this.thirstValue.textContent = `${Math.round(this.survival.thirst)}%`;
+        }
+
+        if (this.temperatureValue && this.survival && this.survival.temperature !== undefined) {
+            this.temperatureValue.textContent = `${Math.round(this.survival.temperature)}°C`;
+        }
+    }
+
+    updateWorldUI() {
+
+        if (this.worldTime && this.dayNight && typeof this.dayNight.getFormattedTime === "function") {
+            this.worldTime.textContent = this.dayNight.getFormattedTime();
+        }
+
+        if (this.worldLocation && this.player) {
+            const pos = typeof this.player.getPosition === "function" 
+                ? this.player.getPosition() 
+                : this.player.position;
+            if (pos) {
+                this.worldLocation.textContent = `X: ${Math.round(pos.x)} | Z: ${Math.round(pos.z)}`;
+            }
+        }
+    }
+
+    updateDebugUI() {
+
+        if (!this.debugInfo) return;
+
+        const fps = Math.round(1 / Math.max(0.001, this.deltaTime));
+        this.debugInfo.textContent = `FPS: ${fps} | Chunk: [${this.currentChunkX}, ${this.currentChunkZ}]`;
+    }
+
+    showInteraction(text) {
+
+        if (!this.interactionMessage) return;
+
+        this.interactionMessage.textContent = text;
+        this.interactionMessage.classList.remove("hidden");
+
+        clearTimeout(this._interactionTimeout);
+        this._interactionTimeout = setTimeout(() => {
+            this.interactionMessage.classList.add("hidden");
+        }, 2000);
     }
 
     // ============================================================
-    // GET GAME STATE
+    // ERROR HANDLING
     // ============================================================
 
-    getGameState() {
-
-        const position =
-            this.player
-                ? this.player.getPosition()
-                : null;
-
-        return {
-
-            started:
-                this.started,
-
-            paused:
-                this.paused,
-
-            elapsedTime:
-                this.elapsedTime,
-
-            player:
-                position
-                    ? {
-                        x: position.x,
-                        y: position.y,
-                        z: position.z
-                    }
-                    : null,
-
-            chunk:
-                this.currentChunkX !== null
-                    ? {
-                        x:
-                            this.currentChunkX,
-                        z:
-                            this.currentChunkZ
-                    }
-                    : null,
-
-            survival:
-                this.survival &&
-                typeof this.survival.getStatus ===
-                "function"
-                    ? this.survival.getStatus()
-                    : null
-        };
-    }
-
-    // ============================================================
-    // FATAL ERROR
-    // ============================================================
-
-    showFatalError(
-        error
-    ) {
+    showFatalError(error) {
 
         this.fatalError = true;
 
-        console.error(
-            "WILD ISLES FATAL ERROR:",
-            error
-        );
-
-        const message =
-            error &&
-            error.message
-                ? error.message
-                : String(error);
-
-        if (this.loadingScreen) {
-
-            this.loadingScreen.style.display =
-                "flex";
-
-            this.loadingScreen.style.opacity =
-                "1";
+        if (this.loadingText) {
+            this.loadingText.textContent = "FATAL ERROR LOADING VEYRA WORLD";
+            this.loadingText.style.color = "#ff4444";
         }
 
-        const title =
-            document.querySelector(
-                ".loading-title"
-            );
-
-        const subtitle =
-            document.querySelector(
-                ".loading-subtitle"
-            );
-
-        const status =
-            document.querySelector(
-                ".loading-status"
-            );
-
-        if (title) {
-
-            title.textContent =
-                "WILD ISLES ERROR";
-        }
-
-        if (subtitle) {
-
-            subtitle.textContent =
-                "VEYRA WORLD FAILED TO START";
-        }
-
-        if (status) {
-
-            status.textContent =
-                message;
-        }
-
-        if (this.loadingProgress) {
-
-            this.loadingProgress.style.width =
-                "100%";
-        }
-    }
-
-    // ============================================================
-    // DISPOSE
-    // ============================================================
-
-    dispose() {
-
-        this.started = false;
-
-        this.paused = true;
-
-        // --------------------------------------------------------
-        // PLAYER
-        // --------------------------------------------------------
-
-        if (
-            this.player &&
-            typeof this.player.dispose ===
-            "function"
-        ) {
-
-            this.player.dispose();
-        }
-
-        // --------------------------------------------------------
-        // SURVIVAL
-        // --------------------------------------------------------
-
-        if (
-            this.survival &&
-            typeof this.survival.dispose ===
-            "function"
-        ) {
-
-            this.survival.dispose();
-        }
-
-        // --------------------------------------------------------
-        // DAY NIGHT
-        // --------------------------------------------------------
-
-        if (
-            this.dayNight &&
-            typeof this.dayNight.dispose ===
-            "function"
-        ) {
-
-            this.dayNight.dispose();
-        }
-
-        // --------------------------------------------------------
-        // ENVIRONMENT
-        // --------------------------------------------------------
-
-        if (
-            this.environment &&
-            typeof this.environment.dispose ===
-            "function"
-        ) {
-
-            this.environment.dispose();
-        }
-
-        // --------------------------------------------------------
-        // WATER
-        // --------------------------------------------------------
-
-        if (
-            this.water &&
-            typeof this.water.dispose ===
-            "function"
-        ) {
-
-            this.water.dispose();
-        }
-
-        // --------------------------------------------------------
-        // TERRAIN
-        // --------------------------------------------------------
-
-        if (
-            this.terrain &&
-            typeof this.terrain.dispose ===
-            "function"
-        ) {
-
-            this.terrain.dispose();
-        }
-
-        // --------------------------------------------------------
-        // RENDERER
-        // --------------------------------------------------------
-
-        if (this.renderer) {
-
-            this.renderer.dispose();
-
-            if (
-                this.renderer.domElement &&
-                this.renderer.domElement.parentNode
-            ) {
-
-                this.renderer.domElement.parentNode.removeChild(
-                    this.renderer.domElement
-                );
-            }
-        }
-
-        this.scene = null;
-        this.camera = null;
-        this.renderer = null;
-
-        this.terrain = null;
-        this.water = null;
-        this.environment = null;
-        this.player = null;
-        this.survival = null;
-        this.dayNight = null;
-
-        console.log(
-            "WILD ISLES DISPOSED"
-        );
+        console.error("Critical Engine Failure:", error);
     }
 }
 
 // ============================================================
-// CREATE GAME
+// BOOTSTRAP
 // ============================================================
 
-let wildIslesGame = null;
-
-try {
-
-    wildIslesGame =
-        new WildIslesGame();
-
-    window.WildIsles =
-        wildIslesGame;
-
-} catch (error) {
-
-    console.error(
-        "WILD ISLES BOOT ERROR:",
-        error
-    );
-
-    const loadingScreen =
-        document.getElementById(
-            "loading-screen"
-        );
-
-    if (loadingScreen) {
-
-        loadingScreen.style.display =
-            "flex";
-
-        loadingScreen.style.opacity =
-            "1";
-    }
-
-    const status =
-        document.querySelector(
-            ".loading-status"
-        );
-
-    if (status) {
-
-        status.textContent =
-            error.message ||
-            "GAME FAILED TO START";
-    }
-}
-
-// ============================================================
-// GLOBAL ERROR HANDLING
-// ============================================================
-
-window.addEventListener(
-    "error",
-    (event) => {
-
-        console.error(
-            "WILD ISLES ERROR:",
-            event.error ||
-            event.message
-        );
-    }
-);
-
-window.addEventListener(
-    "unhandledrejection",
-    (event) => {
-
-        console.error(
-            "WILD ISLES PROMISE ERROR:",
-            event.reason
-        );
-    }
-);
-
-// ============================================================
-// PAGE VISIBILITY
-// ============================================================
-
-document.addEventListener(
-    "visibilitychange",
-    () => {
-
-        if (!wildIslesGame)
-            return;
-
-        if (document.hidden) {
-
-            wildIslesGame.pause();
-
-        } else {
-
-            wildIslesGame.resume();
-        }
-    }
-);
-
-// ============================================================
-// PREVENT MOBILE PAGE SCROLL
-// ============================================================
-
-document.addEventListener(
-    "touchmove",
-    (event) => {
-
-        if (
-            event.target.closest(
-                "#mobile-ui"
-            )
-        ) {
-
-            event.preventDefault();
-        }
-
-    },
-    {
-        passive: false
-    }
-);
-
-// ============================================================
-// EXPORT
-// ============================================================
-
-export {
-    WildIslesGame
-};
+window.addEventListener("DOMContentLoaded", () => {
+    window.game = new WildIslesGame();
+});
