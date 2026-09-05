@@ -2,50 +2,49 @@
 // WILD ISLES
 // VEYRA WORLD
 // public/js/terrain.js
-// HUGE WORLD CHUNK TERRAIN SYSTEM v1.0
+//
+// REALISTIC HUGE WORLD TERRAIN SYSTEM v2.0
 //
 // Features:
-// - 16 km x 16 km playable world
-// - 256m chunks
-// - Dynamic chunk loading/unloading
-// - Global deterministic terrain
-// - Seamless chunk boundaries
-// - Mountains
-// - Forest
-// - Grassland
-// - Highland
-// - Snow
-// - Desert
-// - Coast
-// - Ocean
-// - Vertex colors
-// - Proper normals
+// - 16km x 16km playable world
+// - Chunk streaming
+// - Procedural terrain
+// - Forest / Grassland / Desert / Mountain / Snow / Coast
+// - Procedural ground texture
+// - Terrain vertex color variation
+// - Smooth player grounding
+// - Safe spawn position
 // - Slope detection
-// - Safe spawn positions
-// - Mobile-friendly chunk limits
+// - Mobile optimization
+// - Desktop optimization
+//
+// Three.js r180
 // ============================================================
 
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
+
+
+// ============================================================
+// CLASS
+// ============================================================
 
 export class VeyraTerrain {
 
     constructor(scene) {
 
-        // ========================================================
-        // SCENE
-        // ========================================================
-
         this.scene = scene;
 
-        // ========================================================
-        // HUGE WORLD SETTINGS
-        // ========================================================
+        // ====================================================
+        // WORLD CONFIGURATION
+        // ====================================================
 
         this.worldSize = 16384;
         this.worldHalfSize = this.worldSize / 2;
 
         this.chunkSize = 256;
 
+        // 32 gives good performance.
+        // Later we can introduce LOD for 48/64 segments.
         this.chunkSegments = 32;
 
         this.renderRadius =
@@ -57,186 +56,452 @@ export class VeyraTerrain {
         this.maxLoadedChunks =
             window.innerWidth <= 900 ? 9 : 25;
 
-        // ========================================================
-        // WORLD HEIGHT SETTINGS
-        // ========================================================
+        // ====================================================
+        // TERRAIN LEVELS
+        // ====================================================
 
         this.waterLevel = 1.8;
-
         this.beachLevel = 5.5;
 
         this.maxTerrainHeight = 260;
 
         this.maxWalkableSlope = 38;
 
-        // ========================================================
+        // ====================================================
         // CHUNK STORAGE
-        // ========================================================
+        // ====================================================
 
         this.chunks = new Map();
-
-        this.loadedChunks = new Map();
-
+        this.loadedChunks = new Set();
         this.chunkMeshes = new Map();
 
-        // ========================================================
+        // ====================================================
         // STREAMING STATE
-        // ========================================================
+        // ====================================================
 
         this.currentChunkX = null;
-
         this.currentChunkZ = null;
 
-        this.lastPlayerX = null;
+        this.lastPlayerX = Infinity;
+        this.lastPlayerZ = Infinity;
 
-        this.lastPlayerZ = null;
-
-        this.enabled = true;
-
+        this.streamingEnabled = true;
         this.initialized = false;
 
-        // ========================================================
-        // SHARED MATERIAL
-        // ========================================================
-
-        this.material = new THREE.MeshStandardMaterial({
-
-            vertexColors: true,
-
-            roughness: 0.92,
-
-            metalness: 0.02,
-
-            flatShading: false
-
-        });
-
-        // ========================================================
-        // OCEAN / FAR TERRAIN
-        // ========================================================
-
-        this.oceanMaterial = new THREE.MeshStandardMaterial({
-
-            color: 0x183f4a,
-
-            roughness: 0.18,
-
-            metalness: 0.02,
-
-            transparent: true,
-
-            opacity: 0.92,
-
-            side: THREE.DoubleSide
-
-        });
-
-        // ========================================================
-        // ROOT GROUP
-        // ========================================================
+        // ====================================================
+        // ROOT
+        // ====================================================
 
         this.root = new THREE.Group();
-
         this.root.name = "VeyraWorldTerrain";
 
         this.scene.add(this.root);
 
-        // ========================================================
-        // TERRAIN VERSION
-        // ========================================================
+        // ====================================================
+        // MATERIALS
+        // ====================================================
 
-        this.version = "1.0";
+        this.groundTexture = this.createGroundTexture();
+
+        this.groundMaterial =
+            new THREE.MeshStandardMaterial({
+
+                map: this.groundTexture,
+
+                roughness: 0.96,
+
+                metalness: 0.0,
+
+                vertexColors: true,
+
+                side: THREE.FrontSide
+            });
+
+
+        // ====================================================
+        // BEACH MATERIAL
+        // ====================================================
+
+        this.beachTexture = this.createBeachTexture();
+
+        this.beachMaterial =
+            new THREE.MeshStandardMaterial({
+
+                map: this.beachTexture,
+
+                roughness: 1.0,
+
+                metalness: 0.0,
+
+                vertexColors: true
+            });
+
+
+        // ====================================================
+        // WATER MATERIAL
+        // ====================================================
+
+        this.oceanMaterial =
+            new THREE.MeshStandardMaterial({
+
+                color: 0x234f58,
+
+                roughness: 0.18,
+
+                metalness: 0.04,
+
+                transparent: true,
+
+                opacity: 0.84,
+
+                side: THREE.DoubleSide
+            });
+
+
+        // ====================================================
+        // CREATE WORLD
+        // ====================================================
+
+        this.createWorldOcean();
 
         console.log(
-            "WILD ISLES Huge Terrain v1.0 READY"
+            "%cVeyra Terrain v2.0 READY",
+            "color:#7fd8ff;font-weight:bold"
         );
-    }
 
-
-    // ============================================================
-    // BASIC UTILITIES
-    // ============================================================
-
-    clamp(value, min, max) {
-
-        return Math.max(
-            min,
-            Math.min(max, value)
+        console.log(
+            "World Size:",
+            this.worldSize,
+            "x",
+            this.worldSize
         );
-    }
 
-
-    lerp(a, b, t) {
-
-        return a + (b - a) * t;
-    }
-
-
-    smoothStep(t) {
-
-        t = this.clamp(t, 0, 1);
-
-        return t * t * (3 - 2 * t);
     }
 
 
     // ============================================================
-    // DETERMINISTIC GLOBAL HASH
+    // PROCEDURAL GROUND TEXTURE
+    // ============================================================
+
+    createGroundTexture() {
+
+        const size = 512;
+
+        const canvas =
+            document.createElement("canvas");
+
+        canvas.width = size;
+        canvas.height = size;
+
+        const ctx =
+            canvas.getContext("2d");
+
+        const image =
+            ctx.createImageData(size, size);
+
+        for (let y = 0; y < size; y++) {
+
+            for (let x = 0; x < size; x++) {
+
+                const index =
+                    (y * size + x) * 4;
+
+                const wave1 =
+                    Math.sin(x * 0.055);
+
+                const wave2 =
+                    Math.sin(y * 0.047);
+
+                const wave3 =
+                    Math.sin(
+                        (x + y) * 0.025
+                    );
+
+                const random =
+                    Math.random() * 16;
+
+                let value =
+                    92 +
+                    wave1 * 8 +
+                    wave2 * 7 +
+                    wave3 * 6 +
+                    random;
+
+                value =
+                    THREE.MathUtils.clamp(
+                        value,
+                        50,
+                        145
+                    );
+
+                image.data[index] =
+                    value * 0.73;
+
+                image.data[index + 1] =
+                    value * 0.88;
+
+                image.data[index + 2] =
+                    value * 0.61;
+
+                image.data[index + 3] =
+                    255;
+            }
+        }
+
+        ctx.putImageData(
+            image,
+            0,
+            0
+        );
+
+        // Small natural variation
+        ctx.globalAlpha = 0.12;
+
+        for (let i = 0; i < 3500; i++) {
+
+            const x =
+                Math.random() * size;
+
+            const y =
+                Math.random() * size;
+
+            const radius =
+                Math.random() * 2.4 + 0.3;
+
+            ctx.beginPath();
+
+            ctx.arc(
+                x,
+                y,
+                radius,
+                0,
+                Math.PI * 2
+            );
+
+            ctx.fillStyle =
+                Math.random() > 0.5
+                    ? "#263a20"
+                    : "#b1a675";
+
+            ctx.fill();
+        }
+
+        ctx.globalAlpha = 1;
+
+        const texture =
+            new THREE.CanvasTexture(canvas);
+
+        texture.wrapS =
+            THREE.RepeatWrapping;
+
+        texture.wrapT =
+            THREE.RepeatWrapping;
+
+        texture.repeat.set(18, 18);
+
+        texture.anisotropy =
+            Math.min(
+                8,
+                this.rendererAnisotropy()
+            );
+
+        texture.colorSpace =
+            THREE.SRGBColorSpace;
+
+        texture.needsUpdate = true;
+
+        return texture;
+    }
+
+
+    // ============================================================
+    // BEACH TEXTURE
+    // ============================================================
+
+    createBeachTexture() {
+
+        const size = 256;
+
+        const canvas =
+            document.createElement("canvas");
+
+        canvas.width = size;
+        canvas.height = size;
+
+        const ctx =
+            canvas.getContext("2d");
+
+        const image =
+            ctx.createImageData(size, size);
+
+        for (let y = 0; y < size; y++) {
+
+            for (let x = 0; x < size; x++) {
+
+                const index =
+                    (y * size + x) * 4;
+
+                const n =
+                    Math.random() * 20;
+
+                image.data[index] =
+                    155 + n;
+
+                image.data[index + 1] =
+                    139 + n;
+
+                image.data[index + 2] =
+                    91 + n;
+
+                image.data[index + 3] =
+                    255;
+            }
+        }
+
+        ctx.putImageData(
+            image,
+            0,
+            0
+        );
+
+        const texture =
+            new THREE.CanvasTexture(canvas);
+
+        texture.wrapS =
+            THREE.RepeatWrapping;
+
+        texture.wrapT =
+            THREE.RepeatWrapping;
+
+        texture.repeat.set(12, 12);
+
+        texture.colorSpace =
+            THREE.SRGBColorSpace;
+
+        return texture;
+    }
+
+
+    // ============================================================
+    // ANISOTROPY
+    // ============================================================
+
+    rendererAnisotropy() {
+
+        return 4;
+    }
+
+
+    // ============================================================
+    // DETERMINISTIC HASH
     // ============================================================
 
     hash2D(x, z) {
 
-        let n =
-            Math.sin(
-                x * 127.1 +
-                z * 311.7 +
-                918.3
-            ) *
-            43758.5453123;
+        let h =
+            x * 374761393 +
+            z * 668265263;
 
-        return n - Math.floor(n);
+        h =
+            (h ^ (h >> 13)) * 1274126177;
+
+        h =
+            h ^ (h >> 16);
+
+        return (
+            (h >>> 0) /
+            4294967295
+        );
     }
 
 
     // ============================================================
-    // GLOBAL VALUE NOISE
+    // SMOOTH INTERPOLATION
     // ============================================================
 
-    valueNoise(x, z) {
+    smoothStep(t) {
 
-        const x0 = Math.floor(x);
+        return (
+            t * t *
+            (3 - 2 * t)
+        );
+    }
 
-        const z0 = Math.floor(z);
 
-        const x1 = x0 + 1;
+    // ============================================================
+    // VALUE NOISE
+    // ============================================================
 
-        const z1 = z0 + 1;
+    valueNoise(x, z, scale = 1) {
+
+        x /= scale;
+        z /= scale;
+
+        const x0 =
+            Math.floor(x);
+
+        const z0 =
+            Math.floor(z);
+
+        const x1 =
+            x0 + 1;
+
+        const z1 =
+            z0 + 1;
 
         const tx =
-            this.smoothStep(x - x0);
+            this.smoothStep(
+                x - x0
+            );
 
         const tz =
-            this.smoothStep(z - z0);
+            this.smoothStep(
+                z - z0
+            );
 
         const a =
-            this.hash2D(x0, z0);
+            this.hash2D(
+                x0,
+                z0
+            );
 
         const b =
-            this.hash2D(x1, z0);
+            this.hash2D(
+                x1,
+                z0
+            );
 
         const c =
-            this.hash2D(x0, z1);
+            this.hash2D(
+                x0,
+                z1
+            );
 
         const d =
-            this.hash2D(x1, z1);
+            this.hash2D(
+                x1,
+                z1
+            );
 
         const ab =
-            this.lerp(a, b, tx);
+            THREE.MathUtils.lerp(
+                a,
+                b,
+                tx
+            );
 
         const cd =
-            this.lerp(c, d, tx);
+            THREE.MathUtils.lerp(
+                c,
+                d,
+                tx
+            );
 
-        return this.lerp(ab, cd, tz);
+        return THREE.MathUtils.lerp(
+            ab,
+            cd,
+            tz
+        );
     }
 
 
@@ -244,47 +509,80 @@ export class VeyraTerrain {
     // FRACTAL NOISE
     // ============================================================
 
-    fractalNoise(x, z, octaves = 5) {
+    fractalNoise(x, z) {
 
         let value = 0;
 
         let amplitude = 1;
 
-        let frequency = 1;
-
         let totalAmplitude = 0;
 
-        for (let i = 0; i < octaves; i++) {
+        let frequency = 1;
+
+        const octaves = 5;
+
+        for (
+            let i = 0;
+            i < octaves;
+            i++
+        ) {
 
             value +=
                 this.valueNoise(
                     x * frequency,
-                    z * frequency
+                    z * frequency,
+                    90 / frequency
                 ) * amplitude;
 
-            totalAmplitude += amplitude;
+            totalAmplitude +=
+                amplitude;
 
             amplitude *= 0.5;
 
             frequency *= 2;
-
         }
 
-        return value / totalAmplitude;
+        return (
+            value /
+            totalAmplitude
+        );
     }
 
 
     // ============================================================
-    // CONTINENT / LAND MASS
+    // RIDGED NOISE
+    // ============================================================
+
+    ridgedNoise(x, z) {
+
+        const n =
+            this.fractalNoise(
+                x,
+                z
+            );
+
+        return (
+            1 -
+            Math.abs(
+                n * 2 - 1
+            )
+        );
+    }
+
+
+    // ============================================================
+    // LAND MASK
     // ============================================================
 
     getLandMask(x, z) {
 
         const nx =
-            x / this.worldHalfSize;
+            x /
+            this.worldHalfSize;
 
         const nz =
-            z / this.worldHalfSize;
+            z /
+            this.worldHalfSize;
 
         const distance =
             Math.sqrt(
@@ -292,97 +590,122 @@ export class VeyraTerrain {
                 nz * nz
             );
 
-        // Main continental body
-
-        let continent =
+        // Main island
+        let main =
             1 -
-            this.smoothStep(
-                (distance - 0.15) / 0.82
+            Math.pow(
+                Math.min(
+                    distance,
+                    1.15
+                ),
+                2.15
             );
 
-        // Large secondary land influence
+        main =
+            THREE.MathUtils.clamp(
+                main,
+                0,
+                1
+            );
 
-        const landNoise =
+
+        // Natural coastline
+        const coastNoise =
             this.fractalNoise(
-                x * 0.00022,
-                z * 0.00022,
-                4
+                x * 0.28,
+                z * 0.28
             );
 
-        continent +=
-            (landNoise - 0.5) * 0.42;
+        main +=
+            (coastNoise - 0.5) *
+            0.22;
 
-        // Western landmass
 
+        // West extension
         const westX =
-            (x + 3500) / 2800;
+            x + 2800;
 
         const westZ =
-            (z + 700) / 3300;
+            z - 800;
 
-        const westDistance =
+        const westDist =
             Math.sqrt(
                 westX * westX +
                 westZ * westZ
-            );
+            ) / 2300;
 
-        const westIsland =
+        let west =
             1 -
-            this.smoothStep(
-                (westDistance - 0.45) / 0.85
+            westDist;
+
+        west =
+            THREE.MathUtils.clamp(
+                west,
+                0,
+                1
             );
 
-        continent +=
-            westIsland * 0.38;
 
-        // Eastern landmass
-
+        // East extension
         const eastX =
-            (x - 3900) / 3300;
+            x - 3100;
 
         const eastZ =
-            (z - 1200) / 2700;
+            z + 1000;
 
-        const eastDistance =
+        const eastDist =
             Math.sqrt(
                 eastX * eastX +
                 eastZ * eastZ
-            );
+            ) / 2100;
 
-        const eastIsland =
+        let east =
             1 -
-            this.smoothStep(
-                (eastDistance - 0.40) / 0.82
+            eastDist;
+
+        east =
+            THREE.MathUtils.clamp(
+                east,
+                0,
+                1
             );
 
-        continent +=
-            eastIsland * 0.32;
 
-        // Northern landmass
-
+        // Northern extension
         const northX =
-            (x - 800) / 3600;
+            x + 500;
 
         const northZ =
-            (z - 4800) / 2500;
+            z - 3900;
 
-        const northDistance =
+        const northDist =
             Math.sqrt(
                 northX * northX +
                 northZ * northZ
-            );
+            ) / 2100;
 
-        const northIsland =
+        let north =
             1 -
-            this.smoothStep(
-                (northDistance - 0.35) / 0.8
+            northDist;
+
+        north =
+            THREE.MathUtils.clamp(
+                north,
+                0,
+                1
             );
 
-        continent +=
-            northIsland * 0.25;
 
-        return this.clamp(
-            continent,
+        const result =
+            Math.max(
+                main,
+                west * 0.82,
+                east * 0.78,
+                north * 0.82
+            );
+
+        return THREE.MathUtils.clamp(
+            result,
             0,
             1
         );
@@ -390,234 +713,257 @@ export class VeyraTerrain {
 
 
     // ============================================================
-    // GLOBAL TERRAIN HEIGHT
+    // DESERT MASK
     // ============================================================
 
-    getHeight(x, z) {
+    getDesertMask(x, z) {
 
-        if (!Number.isFinite(x)) x = 0;
+        const centerX =
+            3200;
 
-        if (!Number.isFinite(z)) z = 0;
-
-        // --------------------------------------------------------
-        // Outside world
-        // --------------------------------------------------------
-
-        if (
-            Math.abs(x) > this.worldHalfSize ||
-            Math.abs(z) > this.worldHalfSize
-        ) {
-
-            return this.waterLevel - 2;
-        }
-
-        // --------------------------------------------------------
-        // Land mask
-        // --------------------------------------------------------
-
-        const land =
-            this.getLandMask(x, z);
-
-        // --------------------------------------------------------
-        // Large continental rolling terrain
-        // --------------------------------------------------------
-
-        const largeNoise =
-            this.fractalNoise(
-                x * 0.0017,
-                z * 0.0017,
-                5
-            );
-
-        const mediumNoise =
-            this.fractalNoise(
-                x * 0.006,
-                z * 0.006,
-                4
-            );
-
-        const smallNoise =
-            this.fractalNoise(
-                x * 0.025,
-                z * 0.025,
-                3
-            );
-
-        let height =
-
-            largeNoise * 30 +
-
-            mediumNoise * 10 +
-
-            smallNoise * 2;
-
-        // --------------------------------------------------------
-        // Large mountain belts
-        // --------------------------------------------------------
-
-        const mountainNoise =
-            this.fractalNoise(
-                x * 0.00075,
-                z * 0.00075,
-                5
-            );
-
-        const mountainMask =
-            Math.max(
-                0,
-                mountainNoise - 0.55
-            ) / 0.45;
-
-        height +=
-            Math.pow(
-                mountainMask,
-                1.8
-            ) * 190;
-
-        // --------------------------------------------------------
-        // Central mountain region
-        // --------------------------------------------------------
-
-        const mountainX =
-            (x + 1300) / 2100;
-
-        const mountainZ =
-            (z + 900) / 3000;
-
-        const centralDistance =
-            Math.sqrt(
-                mountainX * mountainX +
-                mountainZ * mountainZ
-            );
-
-        const centralMountain =
-            1 -
-            this.smoothStep(
-                (centralDistance - 0.15) / 0.8
-            );
-
-        height +=
-            centralMountain *
-            mountainNoise *
-            95;
-
-        // --------------------------------------------------------
-        // Northern highlands
-        // --------------------------------------------------------
-
-        if (z > 2600) {
-
-            const northFactor =
-                this.clamp(
-                    (z - 2600) / 2600,
-                    0,
-                    1
-                );
-
-            height +=
-                northFactor *
-                mountainNoise *
-                70;
-        }
-
-        // --------------------------------------------------------
-        // Desert region
-        // --------------------------------------------------------
-
-        const desertCenterX = 4200;
-
-        const desertCenterZ = -2500;
+        const centerZ =
+            2700;
 
         const dx =
-            x - desertCenterX;
+            x - centerX;
 
         const dz =
-            z - desertCenterZ;
+            z - centerZ;
 
-        const desertDistance =
+        const distance =
             Math.sqrt(
                 dx * dx +
                 dz * dz
             );
 
-        const desertMask =
+        let mask =
             1 -
-            this.smoothStep(
-                (desertDistance - 900) / 1900
+            distance / 2600;
+
+        mask =
+            THREE.MathUtils.clamp(
+                mask,
+                0,
+                1
             );
 
-        const desertNoise =
+        return (
+            mask *
+            this.getLandMask(
+                x,
+                z
+            )
+        );
+    }
+
+
+    // ============================================================
+    // MOUNTAIN MASK
+    // ============================================================
+
+    getMountainMask(x, z) {
+
+        const central =
+            Math.exp(
+                -(
+                    x * x +
+                    (z + 1200) *
+                    (z + 1200)
+                ) /
+                (2 * 2500 * 2500)
+            );
+
+        const north =
+            Math.exp(
+                -(
+                    (x - 400) *
+                    (x - 400) +
+                    (z + 3900) *
+                    (z + 3900)
+                ) /
+                (2 * 1700 * 1700)
+            );
+
+        const ridge =
+            this.ridgedNoise(
+                x * 0.75,
+                z * 0.75
+            );
+
+        return THREE.MathUtils.clamp(
+            Math.max(
+                central,
+                north
+            ) *
+            (0.55 + ridge * 0.7),
+            0,
+            1
+        );
+    }
+
+
+    // ============================================================
+    // HEIGHT
+    // ============================================================
+
+    getHeight(x, z) {
+
+        const land =
+            this.getLandMask(
+                x,
+                z
+            );
+
+        if (land < 0.02) {
+
+            return this.waterLevel - 2;
+        }
+
+
+        // --------------------------------------------------------
+        // LARGE TERRAIN
+        // --------------------------------------------------------
+
+        const large =
             this.fractalNoise(
-                x * 0.004,
-                z * 0.004,
-                3
+                x * 0.45,
+                z * 0.45
+            );
+
+
+        // --------------------------------------------------------
+        // MEDIUM TERRAIN
+        // --------------------------------------------------------
+
+        const medium =
+            this.fractalNoise(
+                x * 1.8,
+                z * 1.8
+            );
+
+
+        // --------------------------------------------------------
+        // DETAIL
+        // --------------------------------------------------------
+
+        const detail =
+            this.fractalNoise(
+                x * 5,
+                z * 5
+            );
+
+
+        // --------------------------------------------------------
+        // MOUNTAINS
+        // --------------------------------------------------------
+
+        const mountainMask =
+            this.getMountainMask(
+                x,
+                z
+            );
+
+        const ridge =
+            this.ridgedNoise(
+                x * 0.8,
+                z * 0.8
+            );
+
+        const mountainHeight =
+            mountainMask *
+            (
+                50 +
+                ridge * 150
+            );
+
+
+        // --------------------------------------------------------
+        // HILLS
+        // --------------------------------------------------------
+
+        let height =
+            large * 30 +
+            medium * 13 +
+            detail * 3;
+
+
+        height +=
+            mountainHeight;
+
+
+        // --------------------------------------------------------
+        // DESERT
+        // --------------------------------------------------------
+
+        const desert =
+            this.getDesertMask(
+                x,
+                z
             );
 
         height +=
-            desertMask *
-            desertNoise *
-            10;
+            desert *
+            (
+                medium * 18
+            );
+
 
         // --------------------------------------------------------
-        // Coast shaping
+        // COAST
         // --------------------------------------------------------
 
-        if (land < 0.45) {
+        const coast =
+            THREE.MathUtils.smoothstep(
+                land,
+                0.05,
+                0.42
+            );
 
-            const coastFactor =
-                this.smoothStep(
-                    land / 0.45
-                );
+        height *=
+            0.35 +
+            coast * 0.65;
 
-            height *=
-                coastFactor;
-
-            height =
-                this.lerp(
-                    this.waterLevel - 2,
-                    height,
-                    coastFactor
-                );
-        }
 
         // --------------------------------------------------------
-        // Beaches
+        // BEACH
         // --------------------------------------------------------
 
-        if (
-            height > this.waterLevel &&
-            height < this.beachLevel + 4
-        ) {
+        if (land < 0.48) {
 
-            const beachFactor =
-                this.clamp(
-                    (height - this.waterLevel) / 4,
-                    0,
-                    1
+            const beachBlend =
+                THREE.MathUtils.smoothstep(
+                    land,
+                    0.02,
+                    0.48
                 );
 
             height =
-                this.lerp(
-                    this.waterLevel + 0.3,
+                THREE.MathUtils.lerp(
+                    this.waterLevel - 0.5,
                     height,
-                    beachFactor
+                    beachBlend
                 );
         }
 
+
         // --------------------------------------------------------
-        // Ocean
+        // DEEP WATER
         // --------------------------------------------------------
 
-        if (land < 0.25) {
+        if (land < 0.12) {
+
+            const depth =
+                (0.12 - land) *
+                20;
 
             height =
                 this.waterLevel -
-                2 -
-                (0.25 - land) * 12;
+                depth;
         }
 
+
         // --------------------------------------------------------
-        // Protect starting region
+        // SPAWN AREA FLATTEN
         // --------------------------------------------------------
 
         const spawnDistance =
@@ -626,43 +972,48 @@ export class VeyraTerrain {
                 z * z
             );
 
-        if (spawnDistance < 350) {
+        if (
+            spawnDistance <
+            180
+        ) {
 
-            const spawnNoise =
+            const blend =
+                THREE.MathUtils.smoothstep(
+                    spawnDistance,
+                    80,
+                    180
+                );
+
+            const flatNoise =
                 this.fractalNoise(
-                    x * 0.012,
-                    z * 0.012,
-                    3
+                    x * 0.5,
+                    z * 0.5
                 );
 
             const spawnHeight =
-                9 +
-                spawnNoise * 3;
-
-            const flatten =
-                1 -
-                this.smoothStep(
-                    spawnDistance / 350
-                );
+                10 +
+                flatNoise * 2;
 
             height =
-                this.lerp(
-                    height,
+                THREE.MathUtils.lerp(
                     spawnHeight,
-                    flatten
+                    height,
+                    blend
                 );
         }
 
+
         // --------------------------------------------------------
-        // Final limits
+        // CLAMP
         // --------------------------------------------------------
 
         height =
-            this.clamp(
+            THREE.MathUtils.clamp(
                 height,
-                this.waterLevel - 8,
+                this.waterLevel - 25,
                 this.maxTerrainHeight
             );
+
 
         return height;
     }
@@ -674,46 +1025,49 @@ export class VeyraTerrain {
 
     getGroundHeight(x, z) {
 
-        return this.getHeight(x, z);
+        return this.getHeight(
+            x,
+            z
+        );
     }
 
 
     // ============================================================
-    // NORMAL
+    // TERRAIN NORMAL
     // ============================================================
 
     getNormal(x, z) {
 
-        const sample = 1.5;
+        const delta = 2.0;
 
         const hL =
             this.getHeight(
-                x - sample,
+                x - delta,
                 z
             );
 
         const hR =
             this.getHeight(
-                x + sample,
+                x + delta,
                 z
             );
 
         const hD =
             this.getHeight(
                 x,
-                z - sample
+                z - delta
             );
 
         const hU =
             this.getHeight(
                 x,
-                z + sample
+                z + delta
             );
 
         const normal =
             new THREE.Vector3(
                 hL - hR,
-                sample * 2,
+                delta * 2,
                 hD - hU
             );
 
@@ -724,7 +1078,7 @@ export class VeyraTerrain {
 
 
     // ============================================================
-    // SLOPE ANGLE
+    // SLOPE
     // ============================================================
 
     getSlopeAngle(x, z) {
@@ -735,53 +1089,41 @@ export class VeyraTerrain {
                 z
             );
 
-        const dot =
-            this.clamp(
-                normal.y,
-                -1,
-                1
+        const angle =
+            Math.acos(
+                THREE.MathUtils.clamp(
+                    normal.y,
+                    -1,
+                    1
+                )
             );
 
-        return Math.acos(dot);
+        return angle;
     }
 
 
-    // ============================================================
-    // SLOPE DEGREES
-    // ============================================================
+    getSlopeAngleDegrees(x, z) {
 
-    getSlopeDegrees(x, z) {
-
-        return (
+        return THREE.MathUtils.radToDeg(
             this.getSlopeAngle(
                 x,
                 z
-            ) *
-            180 /
-            Math.PI
+            )
         );
     }
 
 
     // ============================================================
-    // WORLD BOUNDS
+    // ISLAND CHECK
     // ============================================================
 
     isInsideIsland(x, z) {
 
         return (
-
-            x >= -this.worldHalfSize &&
-
-            x <= this.worldHalfSize &&
-
-            z >= -this.worldHalfSize &&
-
-            z <= this.worldHalfSize &&
-
-            this.getHeight(x, z) >
-                this.waterLevel - 0.05
-
+            this.getLandMask(
+                x,
+                z
+            ) > 0.25
         );
     }
 
@@ -793,10 +1135,10 @@ export class VeyraTerrain {
     isWalkable(x, z) {
 
         if (
-            x < -this.worldHalfSize ||
-            x > this.worldHalfSize ||
-            z < -this.worldHalfSize ||
-            z > this.worldHalfSize
+            !this.isInsideIsland(
+                x,
+                z
+            )
         ) {
 
             return false;
@@ -810,14 +1152,14 @@ export class VeyraTerrain {
 
         if (
             height <=
-            this.waterLevel + 0.15
+            this.waterLevel + 0.25
         ) {
 
             return false;
         }
 
         const slope =
-            this.getSlopeDegrees(
+            this.getSlopeAngleDegrees(
                 x,
                 z
             );
@@ -830,109 +1172,60 @@ export class VeyraTerrain {
 
 
     // ============================================================
-    // SAFE GROUND HEIGHT
+    // SAFE GROUND
     // ============================================================
 
     getSafeGroundHeight(
         x,
-        z,
-        searchRadius = 24
+        z
     ) {
 
-        const centerHeight =
-            this.getHeight(
-                x,
-                z
-            );
+        const searchRadius = 20;
 
-        if (
-            this.isWalkable(
-                x,
-                z
-            )
-        ) {
-
-            return centerHeight;
-        }
-
-        const samples = 16;
-
-        let bestHeight = null;
-
-        let bestDistance =
-            Infinity;
+        const step = 5;
 
         for (
-            let i = 0;
-            i < samples;
-            i++
+            let dz = -searchRadius;
+            dz <= searchRadius;
+            dz += step
         ) {
 
-            const angle =
-                (i / samples) *
-                Math.PI *
-                2;
-
-            const distance =
-                searchRadius *
-                (0.35 + (i % 4) * 0.2);
-
-            const px =
-                x +
-                Math.cos(angle) *
-                distance;
-
-            const pz =
-                z +
-                Math.sin(angle) *
-                distance;
-
-            if (
-                this.isWalkable(
-                    px,
-                    pz
-                )
+            for (
+                let dx = -searchRadius;
+                dx <= searchRadius;
+                dx += step
             ) {
 
-                const h =
-                    this.getHeight(
+                const px =
+                    x + dx;
+
+                const pz =
+                    z + dz;
+
+                if (
+                    this.isWalkable(
+                        px,
+                        pz
+                    )
+                ) {
+
+                    return this.getHeight(
                         px,
                         pz
                     );
-
-                const d =
-                    Math.sqrt(
-                        (px - x) *
-                        (px - x) +
-                        (pz - z) *
-                        (pz - z)
-                    );
-
-                if (
-                    d <
-                    bestDistance
-                ) {
-
-                    bestDistance = d;
-
-                    bestHeight = h;
                 }
             }
         }
 
-        if (
-            bestHeight !== null
-        ) {
-
-            return bestHeight;
-        }
-
-        return centerHeight;
+        return this.getHeight(
+            x,
+            z
+        );
     }
 
 
     // ============================================================
-    // SAFE POSITION SEARCH
+    // FIND SAFE POSITION
     // ============================================================
 
     findSafePosition(
@@ -942,7 +1235,6 @@ export class VeyraTerrain {
     ) {
 
         // First try center
-
         if (
             this.isWalkable(
                 centerX,
@@ -958,101 +1250,81 @@ export class VeyraTerrain {
                     this.getHeight(
                         centerX,
                         centerZ
-                    ) + 0.05,
+                    ),
 
                 z: centerZ
-
             };
         }
 
-        // Search grid
 
-        const step = 12;
-
-        let best = null;
-
-        let bestDistance =
-            Infinity;
-
+        // Deterministic/random search
         for (
-            let x = -searchRadius;
-            x <= searchRadius;
-            x += step
+            let i = 0;
+            i < 250;
+            i++
         ) {
 
-            for (
-                let z = -searchRadius;
-                z <= searchRadius;
-                z += step
+            const angle =
+                Math.random() *
+                Math.PI *
+                2;
+
+            const distance =
+                Math.random() *
+                searchRadius;
+
+            const x =
+                centerX +
+                Math.cos(angle) *
+                distance;
+
+            const z =
+                centerZ +
+                Math.sin(angle) *
+                distance;
+
+            if (
+                this.isWalkable(
+                    x,
+                    z
+                )
             ) {
 
-                const px =
-                    centerX + x;
+                return {
 
-                const pz =
-                    centerZ + z;
+                    x,
 
-                if (
-                    !this.isWalkable(
-                        px,
-                        pz
-                    )
-                ) {
+                    y:
+                        this.getHeight(
+                            x,
+                            z
+                        ),
 
-                    continue;
-                }
-
-                const distance =
-                    Math.sqrt(
-                        x * x +
-                        z * z
-                    );
-
-                if (
-                    distance <
-                    bestDistance
-                ) {
-
-                    bestDistance =
-                        distance;
-
-                    best = {
-
-                        x: px,
-
-                        y:
-                            this.getHeight(
-                                px,
-                                pz
-                            ) + 0.05,
-
-                        z: pz
-
-                    };
-                }
+                    z
+                };
             }
         }
 
-        // Emergency fallback
 
-        if (!best) {
+        // Guaranteed fallback
+        const fallbackX =
+            centerX;
 
-            best = {
+        const fallbackZ =
+            centerZ;
 
-                x: 0,
+        return {
 
-                y:
-                    this.getHeight(
-                        0,
-                        0
-                    ) + 0.05,
+            x: fallbackX,
 
-                z: 0
+            y:
+                this.getSafeGroundHeight(
+                    fallbackX,
+                    fallbackZ
+                ),
 
-            };
-        }
-
-        return best;
+            z: fallbackZ
+        };
     }
 
 
@@ -1074,99 +1346,83 @@ export class VeyraTerrain {
                 z
             );
 
-        // Ocean
+        const desert =
+            this.getDesertMask(
+                x,
+                z
+            );
+
+        const mountain =
+            this.getMountainMask(
+                x,
+                z
+            );
+
 
         if (
-            height <
+            height <=
             this.waterLevel
         ) {
 
             return "ocean";
         }
 
-        // Coast
 
         if (
-            height <
-            this.beachLevel + 2
+            height <=
+            this.beachLevel
         ) {
 
             return "coast";
         }
 
-        // Snow
 
         if (
+            mountain > 0.72 &&
             height > 165
         ) {
 
             return "snow";
         }
 
-        // Mountain
 
         if (
-            height > 115
+            mountain > 0.45
         ) {
 
             return "mountain";
         }
 
-        // Highland
 
         if (
-            height > 70
-        ) {
-
-            return "highland";
-        }
-
-        // Desert
-
-        const desertCenterX =
-            4200;
-
-        const desertCenterZ =
-            -2500;
-
-        const dx =
-            x - desertCenterX;
-
-        const dz =
-            z - desertCenterZ;
-
-        const desertDistance =
-            Math.sqrt(
-                dx * dx +
-                dz * dz
-            );
-
-        if (
-            desertDistance <
-            2500
+            desert > 0.52
         ) {
 
             return "desert";
         }
 
-        // Forest
+
+        if (
+            height > 100
+        ) {
+
+            return "highland";
+        }
+
 
         const forestNoise =
             this.fractalNoise(
-                x * 0.002,
-                z * 0.002,
-                4
+                x * 0.7,
+                z * 0.7
             );
 
         if (
-            forestNoise >
-            0.52
+            forestNoise > 0.51
         ) {
 
             return "forest";
         }
 
-        // Grassland
 
         return "grassland";
     }
@@ -1178,8 +1434,8 @@ export class VeyraTerrain {
 
     getVertexColor(
         x,
-        y,
-        z
+        z,
+        height
     ) {
 
         const biome =
@@ -1191,114 +1447,225 @@ export class VeyraTerrain {
         const color =
             new THREE.Color();
 
-        switch (biome) {
-
-            case "ocean":
-
-                color.setRGB(
-                    0.08,
-                    0.18,
-                    0.21
-                );
-
-                break;
-
-
-            case "coast":
-
-                color.setRGB(
-                    0.72,
-                    0.62,
-                    0.42
-                );
-
-                break;
-
-
-            case "desert":
-
-                color.setRGB(
-                    0.68,
-                    0.48,
-                    0.25
-                );
-
-                break;
-
-
-            case "snow":
-
-                color.setRGB(
-                    0.88,
-                    0.92,
-                    0.94
-                );
-
-                break;
-
-
-            case "mountain":
-
-                color.setRGB(
-                    0.32,
-                    0.34,
-                    0.31
-                );
-
-                break;
-
-
-            case "highland":
-
-                color.setRGB(
-                    0.28,
-                    0.42,
-                    0.24
-                );
-
-                break;
-
-
-            case "forest":
-
-                color.setRGB(
-                    0.16,
-                    0.38,
-                    0.16
-                );
-
-                break;
-
-
-            case "grassland":
-
-            default:
-
-                color.setRGB(
-                    0.30,
-                    0.50,
-                    0.22
-                );
-
-                break;
-        }
 
         // --------------------------------------------------------
-        // Height variation
+        // OCEAN
+        // --------------------------------------------------------
+
+        if (
+            biome === "ocean"
+        ) {
+
+            color.setRGB(
+                0.08,
+                0.22,
+                0.25
+            );
+
+            return color;
+        }
+
+
+        // --------------------------------------------------------
+        // COAST
+        // --------------------------------------------------------
+
+        if (
+            biome === "coast"
+        ) {
+
+            const variation =
+                this.valueNoise(
+                    x,
+                    z,
+                    18
+                );
+
+            color.setRGB(
+                0.62 +
+                    variation * 0.08,
+
+                0.57 +
+                    variation * 0.07,
+
+                0.39 +
+                    variation * 0.05
+            );
+
+            return color;
+        }
+
+
+        // --------------------------------------------------------
+        // DESERT
+        // --------------------------------------------------------
+
+        if (
+            biome === "desert"
+        ) {
+
+            const variation =
+                this.valueNoise(
+                    x,
+                    z,
+                    30
+                );
+
+            color.setRGB(
+                0.67 +
+                    variation * 0.12,
+
+                0.53 +
+                    variation * 0.10,
+
+                0.32 +
+                    variation * 0.07
+            );
+
+            return color;
+        }
+
+
+        // --------------------------------------------------------
+        // SNOW
+        // --------------------------------------------------------
+
+        if (
+            biome === "snow"
+        ) {
+
+            const variation =
+                this.valueNoise(
+                    x,
+                    z,
+                    25
+                );
+
+            color.setRGB(
+                0.74 +
+                    variation * 0.08,
+
+                0.79 +
+                    variation * 0.08,
+
+                0.81 +
+                    variation * 0.09
+            );
+
+            return color;
+        }
+
+
+        // --------------------------------------------------------
+        // MOUNTAIN
+        // --------------------------------------------------------
+
+        if (
+            biome === "mountain"
+        ) {
+
+            const variation =
+                this.valueNoise(
+                    x,
+                    z,
+                    28
+                );
+
+            color.setRGB(
+                0.30 +
+                    variation * 0.12,
+
+                0.32 +
+                    variation * 0.10,
+
+                0.28 +
+                    variation * 0.08
+            );
+
+            return color;
+        }
+
+
+        // --------------------------------------------------------
+        // HIGHLAND
+        // --------------------------------------------------------
+
+        if (
+            biome === "highland"
+        ) {
+
+            const variation =
+                this.valueNoise(
+                    x,
+                    z,
+                    35
+                );
+
+            color.setRGB(
+                0.32 +
+                    variation * 0.10,
+
+                0.42 +
+                    variation * 0.11,
+
+                0.26 +
+                    variation * 0.07
+            );
+
+            return color;
+        }
+
+
+        // --------------------------------------------------------
+        // FOREST
+        // --------------------------------------------------------
+
+        if (
+            biome === "forest"
+        ) {
+
+            const variation =
+                this.valueNoise(
+                    x,
+                    z,
+                    25
+                );
+
+            color.setRGB(
+                0.20 +
+                    variation * 0.08,
+
+                0.34 +
+                    variation * 0.13,
+
+                0.16 +
+                    variation * 0.07
+            );
+
+            return color;
+        }
+
+
+        // --------------------------------------------------------
+        // GRASSLAND
         // --------------------------------------------------------
 
         const variation =
             this.valueNoise(
-                x * 0.035,
-                z * 0.035
+                x,
+                z,
+                30
             );
 
-        const factor =
-            0.90 +
-            variation * 0.18;
+        color.setRGB(
+            0.28 +
+                variation * 0.10,
 
-        color.multiplyScalar(
-            factor
+            0.45 +
+                variation * 0.13,
+
+            0.20 +
+                variation * 0.08
         );
 
         return color;
@@ -1306,24 +1673,7 @@ export class VeyraTerrain {
 
 
     // ============================================================
-    // CHUNK KEY
-    // ============================================================
-
-    getChunkKey(
-        chunkX,
-        chunkZ
-    ) {
-
-        return (
-            chunkX +
-            "," +
-            chunkZ
-        );
-    }
-
-
-    // ============================================================
-    // WORLD → CHUNK
+    // CHUNK COORDINATES
     // ============================================================
 
     worldToChunk(
@@ -1335,25 +1685,18 @@ export class VeyraTerrain {
 
             x:
                 Math.floor(
-                    (x +
-                        this.worldHalfSize) /
+                    x /
                     this.chunkSize
                 ),
 
             z:
                 Math.floor(
-                    (z +
-                        this.worldHalfSize) /
+                    z /
                     this.chunkSize
                 )
-
         };
     }
 
-
-    // ============================================================
-    // CHUNK → WORLD
-    // ============================================================
 
     chunkToWorld(
         chunkX,
@@ -1363,16 +1706,89 @@ export class VeyraTerrain {
         return {
 
             x:
-                -this.worldHalfSize +
                 chunkX *
                 this.chunkSize,
 
             z:
-                -this.worldHalfSize +
                 chunkZ *
                 this.chunkSize
-
         };
+    }
+
+
+    getChunkKey(
+        chunkX,
+        chunkZ
+    ) {
+
+        return (
+            `${chunkX},${chunkZ}`
+        );
+    }
+
+
+    // ============================================================
+    // CREATE WORLD OCEAN
+    // ============================================================
+
+    createWorldOcean() {
+
+        // Ocean is intentionally larger than
+        // the currently loaded terrain chunks.
+
+        const oceanSize =
+            this.worldSize *
+            1.35;
+
+        const geometry =
+            new THREE.PlaneGeometry(
+                oceanSize,
+                oceanSize,
+                1,
+                1
+            );
+
+        geometry.rotateX(
+            -Math.PI / 2
+        );
+
+        const material =
+            new THREE.MeshStandardMaterial({
+
+                color: 0x173e48,
+
+                roughness: 0.2,
+
+                metalness: 0.05,
+
+                transparent: true,
+
+                opacity: 0.88,
+
+                side: THREE.DoubleSide
+            });
+
+        this.ocean =
+            new THREE.Mesh(
+                geometry,
+                material
+            );
+
+        this.ocean.name =
+            "VeyraWorldOcean";
+
+        this.ocean.position.y =
+            this.waterLevel;
+
+        this.ocean.receiveShadow =
+            true;
+
+        this.ocean.castShadow =
+            false;
+
+        this.root.add(
+            this.ocean
+        );
     }
 
 
@@ -1391,16 +1807,16 @@ export class VeyraTerrain {
                 chunkZ
             );
 
+
         if (
-            this.loadedChunks.has(
-                key
-            )
+            this.chunks.has(key)
         ) {
 
-            return this.loadedChunks.get(
+            return this.chunks.get(
                 key
             );
         }
+
 
         const origin =
             this.chunkToWorld(
@@ -1408,60 +1824,55 @@ export class VeyraTerrain {
                 chunkZ
             );
 
-        // --------------------------------------------------------
-        // Geometry
-        // --------------------------------------------------------
 
         const geometry =
             new THREE.PlaneGeometry(
-
                 this.chunkSize,
-
                 this.chunkSize,
-
                 this.chunkSegments,
-
                 this.chunkSegments
-
             );
+
 
         geometry.rotateX(
             -Math.PI / 2
         );
 
-        // --------------------------------------------------------
-        // Position vertices
-        // --------------------------------------------------------
 
-        const position =
+        const positions =
             geometry.attributes.position;
 
-        const colors = [];
+        const colors =
+            new Float32Array(
+                positions.count * 3
+            );
 
-        const vertexCount =
-            position.count;
+
+        // --------------------------------------------------------
+        // HEIGHT + COLOR
+        // --------------------------------------------------------
 
         for (
             let i = 0;
-            i < vertexCount;
+            i < positions.count;
             i++
         ) {
 
             const localX =
-                position.getX(i);
+                positions.getX(i);
 
             const localZ =
-                position.getZ(i);
+                positions.getZ(i);
 
             const worldX =
                 origin.x +
-                this.chunkSize / 2 +
-                localX;
+                localX +
+                this.chunkSize / 2;
 
             const worldZ =
                 origin.z +
-                this.chunkSize / 2 +
-                localZ;
+                localZ +
+                this.chunkSize / 2;
 
             const height =
                 this.getHeight(
@@ -1469,61 +1880,54 @@ export class VeyraTerrain {
                     worldZ
                 );
 
-            position.setY(
+
+            positions.setY(
                 i,
                 height
             );
 
+
             const color =
                 this.getVertexColor(
                     worldX,
-                    height,
-                    worldZ
+                    worldZ,
+                    height
                 );
 
-            colors.push(
-                color.r,
-                color.g,
-                color.b
-            );
+
+            colors[i * 3] =
+                color.r;
+
+            colors[i * 3 + 1] =
+                color.g;
+
+            colors[i * 3 + 2] =
+                color.b;
         }
 
-        // --------------------------------------------------------
-        // Vertex colors
-        // --------------------------------------------------------
 
         geometry.setAttribute(
-
             "color",
-
-            new THREE.Float32BufferAttribute(
+            new THREE.BufferAttribute(
                 colors,
                 3
             )
-
         );
 
-        // --------------------------------------------------------
-        // Normals
-        // --------------------------------------------------------
 
         geometry.computeVertexNormals();
 
-        // --------------------------------------------------------
-        // Mesh
-        // --------------------------------------------------------
 
         const mesh =
             new THREE.Mesh(
                 geometry,
-                this.material
+                this.groundMaterial
             );
 
+
         mesh.name =
-            "TerrainChunk_" +
-            chunkX +
-            "_" +
-            chunkZ;
+            `TerrainChunk_${chunkX}_${chunkZ}`;
+
 
         mesh.position.set(
             0,
@@ -1531,39 +1935,43 @@ export class VeyraTerrain {
             0
         );
 
-        mesh.receiveShadow = true;
 
-        mesh.castShadow = false;
+        mesh.receiveShadow =
+            true;
 
-        mesh.frustumCulled = true;
+        mesh.castShadow =
+            false;
 
-        // --------------------------------------------------------
-        // Chunk metadata
-        // --------------------------------------------------------
-
-        mesh.userData = {
-
-            chunkX,
-
-            chunkZ,
-
-            key,
-
-            originX:
-                origin.x,
-
-            originZ:
-                origin.z
-
-        };
 
         this.root.add(
             mesh
         );
 
-        this.loadedChunks.set(
+
+        const data = {
+
             key,
-            mesh
+
+            x: chunkX,
+
+            z: chunkZ,
+
+            mesh,
+
+            geometry,
+
+            lastUsed:
+                performance.now()
+        };
+
+
+        this.chunks.set(
+            key,
+            data
+        );
+
+        this.loadedChunks.add(
+            key
         );
 
         this.chunkMeshes.set(
@@ -1571,22 +1979,8 @@ export class VeyraTerrain {
             mesh
         );
 
-        this.chunks.set(
-            key,
-            {
 
-                x: chunkX,
-
-                z: chunkZ,
-
-                mesh,
-
-                loaded: true
-
-            }
-        );
-
-        return mesh;
+        return data;
     }
 
 
@@ -1605,26 +1999,39 @@ export class VeyraTerrain {
                 chunkZ
             );
 
-        const mesh =
-            this.loadedChunks.get(
+        const chunk =
+            this.chunks.get(
                 key
             );
 
-        if (!mesh) {
+
+        if (!chunk) {
 
             return;
         }
 
-        this.root.remove(
-            mesh
-        );
 
         if (
-            mesh.geometry
+            chunk.mesh
         ) {
 
-            mesh.geometry.dispose();
+            this.root.remove(
+                chunk.mesh
+            );
         }
+
+
+        if (
+            chunk.geometry
+        ) {
+
+            chunk.geometry.dispose();
+        }
+
+
+        this.chunks.delete(
+            key
+        );
 
         this.loadedChunks.delete(
             key
@@ -1633,16 +2040,6 @@ export class VeyraTerrain {
         this.chunkMeshes.delete(
             key
         );
-
-        const chunk =
-            this.chunks.get(
-                key
-            );
-
-        if (chunk) {
-
-            chunk.loaded = false;
-        }
     }
 
 
@@ -1666,82 +2063,62 @@ export class VeyraTerrain {
         for (
             let dz =
                 -this.renderRadius;
-
             dz <=
                 this.renderRadius;
-
             dz++
         ) {
 
             for (
                 let dx =
                     -this.renderRadius;
-
                 dx <=
                     this.renderRadius;
-
                 dx++
             ) {
 
-                const chunkX =
+                const cx =
                     center.x + dx;
 
-                const chunkZ =
+                const cz =
                     center.z + dz;
 
-                const world =
-                    this.chunkToWorld(
-                        chunkX,
-                        chunkZ
+
+                const distance =
+                    Math.max(
+                        Math.abs(dx),
+                        Math.abs(dz)
                     );
 
+
                 if (
-                    world.x +
-                        this.chunkSize <
-                        -this.worldHalfSize ||
-
-                    world.x >
-                        this.worldHalfSize ||
-
-                    world.z +
-                        this.chunkSize <
-                        -this.worldHalfSize ||
-
-                    world.z >
-                        this.worldHalfSize
+                    distance <=
+                    this.renderRadius
                 ) {
 
-                    continue;
+                    required.push({
+                        x: cx,
+                        z: cz,
+                        distance
+                    });
                 }
-
-                required.push({
-
-                    x: chunkX,
-
-                    z: chunkZ,
-
-                    distance:
-                        Math.sqrt(
-                            dx * dx +
-                            dz * dz
-                        )
-
-                });
             }
         }
 
+
+        // Nearest chunks first
         required.sort(
             (a, b) =>
                 a.distance -
                 b.distance
         );
 
+
         return required;
     }
 
 
     // ============================================================
-    // STREAMING UPDATE
+    // UPDATE STREAMING
     // ============================================================
 
     update(
@@ -1749,70 +2126,62 @@ export class VeyraTerrain {
         playerZ
     ) {
 
-        if (!this.enabled) {
+        if (
+            !this.streamingEnabled
+        ) {
 
             return;
         }
 
+
         if (
             !Number.isFinite(
                 playerX
-            )
-        ) {
-
-            playerX = 0;
-        }
-
-        if (
+            ) ||
             !Number.isFinite(
                 playerZ
             )
         ) {
 
-            playerZ = 0;
+            return;
         }
 
-        playerX =
-            this.clamp(
-                playerX,
-                -this.worldHalfSize,
-                this.worldHalfSize
-            );
 
-        playerZ =
-            this.clamp(
-                playerZ,
-                -this.worldHalfSize,
-                this.worldHalfSize
-            );
-
-        const center =
+        const current =
             this.worldToChunk(
                 playerX,
                 playerZ
             );
 
+
         const chunkChanged =
-
-            center.x !==
+            current.x !==
                 this.currentChunkX ||
-
-            center.z !==
+            current.z !==
                 this.currentChunkZ;
+
 
         if (
             !chunkChanged &&
-            this.initialized
+            Math.abs(
+                playerX -
+                this.lastPlayerX
+            ) < 24 &&
+            Math.abs(
+                playerZ -
+                this.lastPlayerZ
+            ) < 24
         ) {
 
             return;
         }
 
+
         this.currentChunkX =
-            center.x;
+            current.x;
 
         this.currentChunkZ =
-            center.z;
+            current.z;
 
         this.lastPlayerX =
             playerX;
@@ -1820,9 +2189,6 @@ export class VeyraTerrain {
         this.lastPlayerZ =
             playerZ;
 
-        // --------------------------------------------------------
-        // Load required chunks
-        // --------------------------------------------------------
 
         const required =
             this.getRequiredChunks(
@@ -1830,94 +2196,106 @@ export class VeyraTerrain {
                 playerZ
             );
 
+
+        // --------------------------------------------------------
+        // LOAD
+        // --------------------------------------------------------
+
         for (
-            const chunk
-            of required
+            const item of required
         ) {
 
             const key =
                 this.getChunkKey(
-                    chunk.x,
-                    chunk.z
+                    item.x,
+                    item.z
                 );
 
             if (
-                !this.loadedChunks.has(
+                !this.chunks.has(
                     key
                 )
             ) {
 
                 this.createChunk(
+                    item.x,
+                    item.z
+                );
+            }
+
+
+            const chunk =
+                this.chunks.get(
+                    key
+                );
+
+            if (chunk) {
+
+                chunk.lastUsed =
+                    performance.now();
+            }
+        }
+
+
+        // --------------------------------------------------------
+        // UNLOAD DISTANT
+        // --------------------------------------------------------
+
+        const keys =
+            Array.from(
+                this.chunks.keys()
+            );
+
+
+        for (
+            const key of keys
+        ) {
+
+            const chunk =
+                this.chunks.get(
+                    key
+                );
+
+            if (!chunk) {
+
+                continue;
+            }
+
+
+            const dx =
+                Math.abs(
+                    chunk.x -
+                    current.x
+                );
+
+            const dz =
+                Math.abs(
+                    chunk.z -
+                    current.z
+                );
+
+
+            const distance =
+                Math.max(
+                    dx,
+                    dz
+                );
+
+
+            if (
+                distance >
+                this.unloadRadius
+            ) {
+
+                this.unloadChunk(
                     chunk.x,
                     chunk.z
                 );
             }
         }
 
-        // --------------------------------------------------------
-        // Unload far chunks
-        // --------------------------------------------------------
-
-        const unloadList = [];
-
-        for (
-            const [
-                key,
-                mesh
-            ]
-            of this.loadedChunks
-        ) {
-
-            const data =
-                mesh.userData;
-
-            const dx =
-                Math.abs(
-                    data.chunkX -
-                    center.x
-                );
-
-            const dz =
-                Math.abs(
-                    data.chunkZ -
-                    center.z
-                );
-
-            if (
-                dx >
-                    this.unloadRadius ||
-                dz >
-                    this.unloadRadius
-            ) {
-
-                unloadList.push(
-                    data
-                );
-            }
-        }
-
-        for (
-            const data
-            of unloadList
-        ) {
-
-            this.unloadChunk(
-                data.chunkX,
-                data.chunkZ
-            );
-        }
 
         this.enforceChunkLimit();
-
-        this.initialized = true;
-
-        console.log(
-            "World Chunk:",
-            center.x,
-            center.z,
-            "| Loaded:",
-            this.loadedChunks.size
-        );
     }
 
 
@@ -1928,91 +2306,95 @@ export class VeyraTerrain {
     enforceChunkLimit() {
 
         if (
-            this.loadedChunks.size <=
+            this.chunks.size <=
             this.maxLoadedChunks
         ) {
 
             return;
         }
 
-        const centerX =
+
+        const currentX =
             this.currentChunkX;
 
-        const centerZ =
+        const currentZ =
             this.currentChunkZ;
 
-        const chunks = [];
 
-        for (
-            const [
-                key,
-                mesh
-            ]
-            of this.loadedChunks
-        ) {
+        const chunks =
+            Array.from(
+                this.chunks.values()
+            );
 
-            const data =
-                mesh.userData;
-
-            const dx =
-                data.chunkX -
-                centerX;
-
-            const dz =
-                data.chunkZ -
-                centerZ;
-
-            chunks.push({
-
-                key,
-
-                distance:
-                    Math.sqrt(
-                        dx * dx +
-                        dz * dz
-                    )
-
-            });
-        }
 
         chunks.sort(
-            (a, b) =>
-                b.distance -
-                a.distance
+            (a, b) => {
+
+                const da =
+                    Math.max(
+                        Math.abs(
+                            a.x -
+                            currentX
+                        ),
+                        Math.abs(
+                            a.z -
+                            currentZ
+                        )
+                    );
+
+                const db =
+                    Math.max(
+                        Math.abs(
+                            b.x -
+                            currentX
+                        ),
+                        Math.abs(
+                            b.z -
+                            currentZ
+                        )
+                    );
+
+                return db - da;
+            }
         );
 
+
         while (
-            this.loadedChunks.size >
+            this.chunks.size >
             this.maxLoadedChunks &&
-            chunks.length
+            chunks.length > 0
         ) {
 
-            const farthest =
+            const chunk =
                 chunks.shift();
 
-            const mesh =
-                this.loadedChunks.get(
-                    farthest.key
-                );
+            if (!chunk) {
 
-            if (!mesh) {
+                break;
+            }
+
+
+            if (
+                chunk.x ===
+                    currentX &&
+                chunk.z ===
+                    currentZ
+            ) {
 
                 continue;
             }
 
-            const data =
-                mesh.userData;
 
             this.unloadChunk(
-                data.chunkX,
-                data.chunkZ
+                chunk.x,
+                chunk.z
             );
         }
     }
 
 
     // ============================================================
-    // CHUNK INFORMATION
+    // GET CHUNK
     // ============================================================
 
     getChunk(
@@ -2030,16 +2412,60 @@ export class VeyraTerrain {
 
 
     // ============================================================
-    // WORLD POSITION INFORMATION
+    // GET WORLD POSITION
     // ============================================================
 
     getWorldPosition(
+        chunkX,
+        chunkZ
+    ) {
+
+        return this.chunkToWorld(
+            chunkX,
+            chunkZ
+        );
+    }
+
+
+    // ============================================================
+    // PLAYER CHUNK
+    // ============================================================
+
+    getPlayerChunk(
         x,
         z
     ) {
 
-        const chunk =
-            this.worldToChunk(
+        return this.worldToChunk(
+            x,
+            z
+        );
+    }
+
+
+    // ============================================================
+    // TERRAIN INFORMATION
+    // ============================================================
+
+    getTerrainInfo(
+        x,
+        z
+    ) {
+
+        const height =
+            this.getHeight(
+                x,
+                z
+            );
+
+        const biome =
+            this.getBiome(
+                x,
+                z
+            );
+
+        const slope =
+            this.getSlopeAngleDegrees(
                 x,
                 z
             );
@@ -2050,112 +2476,26 @@ export class VeyraTerrain {
 
             z,
 
-            chunkX:
-                chunk.x,
+            height,
 
-            chunkZ:
-                chunk.z,
+            y: height,
 
-            chunkKey:
-                this.getChunkKey(
-                    chunk.x,
-                    chunk.z
-                ),
+            biome,
 
-            height:
-                this.getHeight(
+            slope,
+
+            walkable:
+                this.isWalkable(
                     x,
                     z
                 ),
 
-            biome:
-                this.getBiome(
-                    x,
-                    z
-                )
+            underwater:
+                height <=
+                this.waterLevel,
 
-        };
-    }
-
-
-    // ============================================================
-    // PLAYER CHUNK
-    // ============================================================
-
-    getPlayerChunk() {
-
-        if (
-            this.currentChunkX === null
-        ) {
-
-            return null;
-        }
-
-        return {
-
-            x:
-                this.currentChunkX,
-
-            z:
-                this.currentChunkZ,
-
-            key:
-                this.getChunkKey(
-                    this.currentChunkX,
-                    this.currentChunkZ
-                )
-
-        };
-    }
-
-
-    // ============================================================
-    // WORLD STATS
-    // ============================================================
-
-    getTerrainInfo(
-        x = 0,
-        z = 0
-    ) {
-
-        return {
-
-            worldSize:
-                this.worldSize,
-
-            worldHalfSize:
-                this.worldHalfSize,
-
-            chunkSize:
-                this.chunkSize,
-
-            loadedChunks:
-                this.loadedChunks.size,
-
-            maxLoadedChunks:
-                this.maxLoadedChunks,
-
-            playerChunk:
-                this.getPlayerChunk(),
-
-            height:
-                this.getHeight(
-                    x,
-                    z
-                ),
-
-            slope:
-                this.getSlopeDegrees(
-                    x,
-                    z
-                ),
-
-            biome:
-                this.getBiome(
-                    x,
-                    z
-                )
-
+            waterLevel:
+                this.waterLevel
         };
     }
 
@@ -2166,7 +2506,8 @@ export class VeyraTerrain {
 
     enable() {
 
-        this.enabled = true;
+        this.streamingEnabled =
+            true;
     }
 
 
@@ -2176,50 +2517,78 @@ export class VeyraTerrain {
 
     disable() {
 
-        this.enabled = false;
+        this.streamingEnabled =
+            false;
     }
 
 
     // ============================================================
-    // CLEAR CHUNKS
+    // CLEAR
     // ============================================================
 
     clear() {
 
-        const chunks = [];
-
-        for (
-            const mesh
-            of this.loadedChunks.values()
-        ) {
-
-            chunks.push(
-                mesh.userData
+        const keys =
+            Array.from(
+                this.chunks.keys()
             );
-        }
+
 
         for (
-            const data
-            of chunks
+            const key of keys
         ) {
+
+            const chunk =
+                this.chunks.get(
+                    key
+                );
+
+            if (!chunk) {
+
+                continue;
+            }
+
 
             this.unloadChunk(
-                data.chunkX,
-                data.chunkZ
+                chunk.x,
+                chunk.z
             );
         }
+    }
 
-        this.chunks.clear();
 
-        this.loadedChunks.clear();
+    // ============================================================
+    // STATS
+    // ============================================================
 
-        this.chunkMeshes.clear();
+    getStats() {
 
-        this.currentChunkX = null;
+        return {
 
-        this.currentChunkZ = null;
+            worldSize:
+                this.worldSize,
 
-        this.initialized = false;
+            chunkSize:
+                this.chunkSize,
+
+            loadedChunks:
+                this.chunks.size,
+
+            maxLoadedChunks:
+                this.maxLoadedChunks,
+
+            currentChunkX:
+                this.currentChunkX,
+
+            currentChunkZ:
+                this.currentChunkZ,
+
+            renderRadius:
+                this.renderRadius,
+
+            unloadRadius:
+                this.unloadRadius
+        };
     }
 
 
@@ -2231,19 +2600,62 @@ export class VeyraTerrain {
 
         this.clear();
 
-        if (
-            this.material
-        ) {
-
-            this.material.dispose();
-        }
 
         if (
-            this.oceanMaterial
+            this.groundMaterial
         ) {
 
-            this.oceanMaterial.dispose();
+            this.groundMaterial.dispose();
         }
+
+
+        if (
+            this.groundTexture
+        ) {
+
+            this.groundTexture.dispose();
+        }
+
+
+        if (
+            this.beachMaterial
+        ) {
+
+            this.beachMaterial.dispose();
+        }
+
+
+        if (
+            this.beachTexture
+        ) {
+
+            this.beachTexture.dispose();
+        }
+
+
+        if (
+            this.ocean
+        ) {
+
+            if (
+                this.ocean.geometry
+            ) {
+
+                this.ocean.geometry.dispose();
+            }
+
+            if (
+                this.ocean.material
+            ) {
+
+                this.ocean.material.dispose();
+            }
+
+            this.root.remove(
+                this.ocean
+            );
+        }
+
 
         if (
             this.root &&
@@ -2255,9 +2667,6 @@ export class VeyraTerrain {
             );
         }
 
-        this.scene = null;
-
-        this.root = null;
 
         this.chunks.clear();
 
@@ -2266,12 +2675,20 @@ export class VeyraTerrain {
         this.chunkMeshes.clear();
 
         console.log(
-            "WILD ISLES Terrain disposed"
+            "Veyra Terrain disposed"
         );
     }
 }
 
 
 // ============================================================
-// END OF TERRAIN.JS
+// GLOBAL DEBUG ACCESS
 // ============================================================
+
+if (
+    typeof window !== "undefined"
+) {
+
+    window.VeyraTerrain =
+        VeyraTerrain;
+}
