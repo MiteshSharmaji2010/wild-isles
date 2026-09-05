@@ -1599,4 +1599,21 @@ class WildIslesGame {
 
 window.addEventListener("DOMContentLoaded", () => {
     window.game = new WildIslesGame();
-});
+});   import { ThirdPersonCamera } from "./camera.js";
+
+// Scene setup ke baad:
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 10000);
+const player = new Player(scene, terrain);
+const thirdPersonCamera = new ThirdPersonCamera(camera, player);
+
+// Main Animation Loop:
+function animate(time) {
+    requestAnimationFrame(animate);
+    
+    const deltaTime = clock.getDelta();
+    
+    player.update(deltaTime, thirdPersonCamera.yaw);
+    thirdPersonCamera.update(deltaTime);
+    
+    renderer.render(scene, camera);
+}
