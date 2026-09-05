@@ -961,402 +961,269 @@ class WildIslesGame {
                         : event;
 
                 this.updateJoystick(
-                    touch.clientX,
-                    touch.clientY
-                );
-            };
+              import * as THREE from "three";
+import { ThirdPersonCamera } from "./camera.js";
 
-        const endJoystick =
-            (event) => {
+export class WildIslesGame {
+    constructor() {
+        this.initialized = false;
+        this.started = false;
+        this.loading = true;
+        this.paused = false;
+        this.fatalError = false;
 
-                if (!this.joystickActive)
-                    return;
+        this.keys = {};
+        this.deltaTime = 0;
+        this.elapsedTime = 0;
+        this.clock = new THREE.Clock();
 
-                event.preventDefault();
+        // Mobile / Joystick States
+        this.mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        this.joystickActive = false;
+        this.joystickX = 0;
+        this.joystickY = 0;
+        this.mobileRunning = false;
 
-                this.joystickActive =
-                    false;
+        // Dynamic Chunk System
+        this.chunkSize = 64;
+        this.currentChunkX = 0;
+        this.currentChunkZ = 0;
+        this.lastChunkX = null;
+        this.lastChunkZ = null;
 
-                this.joystickX = 0;
-                this.joystickY = 0;
+        // Camera Orbit System
+        this.cameraTarget = new THREE.Vector3();
+        this.cameraDistance = 5;
+        this.cameraYaw = 0;
+        this.cameraPitch = 0;
+        this.cameraHeight = 1.6;
 
-                if (this.joystickKnob) {
+        // Bind Main Animation Loop
+        this.animate = this.animate.bind(this);
 
-                    this.joystickKnob.style.transform =
-                        "translate(-50%, -50%)";
-                }
-            };
+        this.init();
+    }
 
-        this.mobileJoystick.addEventListener(
-            "touchstart",
-            startJoystick,
-            {
-                passive: false
-            }
-        );
-
-        this.mobileJoystick.addEventListener(
-            "touchmove",
-            moveJoystick,
-            {
-                passive: false
-            }
-        );
-
-        this.mobileJoystick.addEventListener(
-            "touchend",
-            endJoystick,
-            {
-                passive: false
-            }
-        );
-
-        this.mobileJoystick.addEventListener(
-            "touchcancel",
-            endJoystick,
-            {
-                passive: false
-            }
-        );
-
-        // --------------------------------------------------------
-        // RUN
-        // --------------------------------------------------------
-
-        if (this.mobileRun) {
-
-            const runStart =
-                (event) => {
-
-                    event.preventDefault();
-
-                    this.mobileRunning =
-                        true;
-                };
-
-            const runEnd =
-                (event) => {
-
-                    event.preventDefault();
-
-                    this.mobileRunning =
-                        false;
-                };
-
-            this.mobileRun.addEventListener(
-                "touchstart",
-                runStart,
-                {
-                    passive: false
-                }
+    init() {
+        try {
+            // Three.js Core Setup
+            this.scene = new THREE.Scene();
+            this.camera = new THREE.PerspectiveCamera(
+                60,
+                window.innerWidth / Math.max(1, window.innerHeight),
+                0.1,
+                10000
             );
 
-            this.mobileRun.addEventListener(
-                "touchend",
-                runEnd,
-                {
-                    passive: false
-                }
-            );
+            this.renderer = new THREE.WebGLRenderer({ antialias: true });
+            this.renderer.setSize(window.innerWidth, window.innerHeight);
+            this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            document.body.appendChild(this.renderer.domElement);
 
-            this.mobileRun.addEventListener(
-                "touchcancel",
-                runEnd,
-                {
-                    passive: false
-                }
-            );
+            // DOM Elements Setup
+            this.setupUIReferences();
+            this.setupEventListeners();
+            this.setupResize();
+
+            if (this.mobile) {
+                this.setupMobileControls();
+            }
+
+            this.initialized = true;
+            this.startGame();
+        } catch (err) {
+            this.showFatalError(err);
         }
+    }
 
-        // --------------------------------------------------------
-        // JUMP
-        // --------------------------------------------------------
+    setupUIReferences() {
+        this.loadingScreen = document.getElementById("loading-screen");
+        this.loadingProgress = document.getElementById("loading-progress");
+        this.loadingText = document.getElementById("loading-text");
+        this.gameUI = document.getElementById("game-ui");
 
-        if (this.mobileJump) {
+        // Mobile Controls DOM
+        this.mobileJoystick = document.getElementById("joystick-container");
+        this.joystickKnob = document.getElementById("joystick-knob");
+        this.mobileRun = document.getElementById("btn-run");
+        this.mobileJump = document.getElementById("btn-jump");
+        this.mobileAction = document.getElementById("btn-action");
 
-            this.mobileJump.addEventListener(
-                "touchstart",
-                (event) => {
+        // Player UI DOM
+        this.healthFill = document.getElementById("health-fill");
+        this.staminaFill = document.getElementById("stamina-fill");
+        this.hungerValue = document.getElementById("hunger-val");
+        this.thirstValue = document.getElementById("thirst-val");
+        this.temperatureValue = document.getElementById("temp-val");
+        this.worldTime = document.getElementById("world-time");
+        this.worldLocation = document.getElementById("world-location");
+        this.debugInfo = document.getElementById("debug-info");
+        this.interactionMessage = document.getElementById("interaction-msg");
+    }
 
-                    event.preventDefault();
+    setupEventListeners() {
+        window.addEventListener("keydown", (e) => {
+            this.keys[e.code] = true;
+        });
 
-                    if (
-                        this.player &&
-                        typeof this.player.jump === "function"
-                    ) {
-
-                        this.player.jump();
-                    }
-                },
-                {
-                    passive: false
-                }
-            );
-        }
-
-        // --------------------------------------------------------
-        // ACTION
-        // --------------------------------------------------------
-
-        if (this.mobileAction) {
-
-            this.mobileAction.addEventListener(
-                "touchstart",
-                (event) => {
-
-                    event.preventDefault();
-
-                    this.showInteraction(
-                        "ACTION"
-                    );
-                },
-                {
-                    passive: false
-                }
-            );
-        }
-
-        console.log(
-            "Mobile Controls READY"
-        );
+        window.addEventListener("keyup", (e) => {
+            this.keys[e.code] = false;
+        });
     }
 
     // ============================================================
-    // JOYSTICK
+    // MOBILE CONTROLS & JOYSTICK
     // ============================================================
 
-    updateJoystick(
-        clientX,
-        clientY
-    ) {
+    setupMobileControls() {
+        if (!this.mobileJoystick) return;
 
-        const rect =
-            this.mobileJoystick
-                .getBoundingClientRect();
+        const startJoystick = (event) => {
+            event.preventDefault();
+            this.joystickActive = true;
+            const touch = event.touches[0];
+            this.updateJoystick(touch.clientX, touch.clientY);
+        };
 
-        const centerX =
-            rect.left +
-            rect.width / 2;
+        const moveJoystick = (event) => {
+            if (!this.joystickActive) return;
+            event.preventDefault();
+            const touch = event.touches[0];
+            this.updateJoystick(touch.clientX, touch.clientY);
+        };
 
-        const centerY =
-            rect.top +
-            rect.height / 2;
+        const endJoystick = (event) => {
+            if (!this.joystickActive) return;
+            event.preventDefault();
+            this.joystickActive = false;
+            this.joystickX = 0;
+            this.joystickY = 0;
 
-        let dx =
-            clientX -
-            centerX;
+            if (this.joystickKnob) {
+                this.joystickKnob.style.transform = "translate(-50%, -50%)";
+            }
+        };
 
-        let dy =
-            clientY -
-            centerY;
+        this.mobileJoystick.addEventListener("touchstart", startJoystick, { passive: false });
+        this.mobileJoystick.addEventListener("touchmove", moveJoystick, { passive: false });
+        this.mobileJoystick.addEventListener("touchend", endJoystick, { passive: false });
+        this.mobileJoystick.addEventListener("touchcancel", endJoystick, { passive: false });
 
-        const maxDistance =
-            rect.width * 0.32;
+        if (this.mobileRun) {
+            this.mobileRun.addEventListener("touchstart", (e) => { e.preventDefault(); this.mobileRunning = true; }, { passive: false });
+            this.mobileRun.addEventListener("touchend", (e) => { e.preventDefault(); this.mobileRunning = false; }, { passive: false });
+            this.mobileRun.addEventListener("touchcancel", (e) => { e.preventDefault(); this.mobileRunning = false; }, { passive: false });
+        }
 
-        const distance =
-            Math.sqrt(
-                dx * dx +
-                dy * dy
-            );
+        if (this.mobileJump) {
+            this.mobileJump.addEventListener("touchstart", (e) => {
+                e.preventDefault();
+                if (this.player && typeof this.player.jump === "function") {
+                    this.player.jump();
+                }
+            }, { passive: false });
+        }
+
+        if (this.mobileAction) {
+            this.mobileAction.addEventListener("touchstart", (e) => {
+                e.preventDefault();
+                this.showInteraction("ACTION");
+            }, { passive: false });
+        }
+
+        console.log("Mobile Controls READY");
+    }
+
+    updateJoystick(clientX, clientY) {
+        const rect = this.mobileJoystick.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+
+        let dx = clientX - centerX;
+        let dy = clientY - centerY;
+
+        const maxDistance = rect.width * 0.32;
+        const distance = Math.sqrt(dx * dx + dy * dy);
 
         if (distance > maxDistance) {
-
-            const factor =
-                maxDistance /
-                distance;
-
+            const factor = maxDistance / distance;
             dx *= factor;
             dy *= factor;
         }
 
-        this.joystickX =
-            dx / maxDistance;
-
-        this.joystickY =
-            dy / maxDistance;
+        this.joystickX = dx / maxDistance;
+        this.joystickY = dy / maxDistance;
 
         if (this.joystickKnob) {
-
-            this.joystickKnob.style.transform =
-                `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+            this.joystickKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
         }
     }
-
-    // ============================================================
-    // RESIZE
-    // ============================================================
 
     setupResize() {
+        window.addEventListener("resize", () => {
+            if (!this.camera || !this.renderer) return;
 
-        window.addEventListener(
-            "resize",
-            () => {
-
-                if (!this.camera ||
-                    !this.renderer)
-                    return;
-
-                this.camera.aspect =
-                    window.innerWidth /
-                    Math.max(
-                        1,
-                        window.innerHeight
-                    );
-
-                this.camera.updateProjectionMatrix();
-
-                this.renderer.setSize(
-                    window.innerWidth,
-                    window.innerHeight,
-                    false
-                );
-            }
-        );
+            this.camera.aspect = window.innerWidth / Math.max(1, window.innerHeight);
+            this.camera.updateProjectionMatrix();
+            this.renderer.setSize(window.innerWidth, window.innerHeight, false);
+        });
     }
-
-    // ============================================================
-    // UI
-    // ============================================================
 
     setupUI() {
-
         if (this.gameUI) {
-
-            this.gameUI.classList.remove(
-                "hidden"
-            );
+            this.gameUI.classList.remove("hidden");
         }
-
         this.updatePlayerUI();
-
         this.updateWorldUI();
-
         this.updateDebugUI();
-
-        console.log(
-            "Game UI READY"
-        );
+        console.log("Game UI READY");
     }
 
-    // ============================================================
-    // LOADING
-    // ============================================================
+    setLoading(progress, message) {
+        const value = THREE.MathUtils.clamp(Number(progress) || 0, 0, 100);
 
-    setLoading(
-        progress,
-        message
-    ) {
+        if (this.loadingProgress) this.loadingProgress.style.width = `${value}%`;
+        if (this.loadingText) this.loadingText.textContent = message || "LOADING";
 
-        const value =
-            THREE.MathUtils.clamp(
-                Number(progress) || 0,
-                0,
-                100
-            );
+        const status = document.querySelector(".loading-status");
+        if (status) status.textContent = message || "LOADING";
 
-        if (this.loadingProgress) {
-
-            this.loadingProgress.style.width =
-                `${value}%`;
-        }
-
-        if (this.loadingText) {
-
-            this.loadingText.textContent =
-                message || "LOADING";
-        }
-
-        const status =
-            document.querySelector(
-                ".loading-status"
-            );
-
-        if (status) {
-
-            status.textContent =
-                message || "LOADING";
-        }
-
-        const percent =
-            document.querySelector(
-                ".loading-line"
-            );
-
-        if (percent) {
-
-            percent.textContent =
-                `${Math.round(value)}%`;
-        }
+        const percent = document.querySelector(".loading-line");
+        if (percent) percent.textContent = `${Math.round(value)}%`;
     }
-
-    // ============================================================
-    // START GAME
-    // ============================================================
 
     startGame() {
-
         if (!this.initialized) {
-
-            console.warn(
-                "Game not initialized"
-            );
-
+            console.warn("Game not initialized");
             return;
         }
 
         this.started = true;
-
         this.loading = false;
+        this.setLoading(100, "VEYRA WORLD READY");
 
-        this.setLoading(
-            100,
-            "VEYRA WORLD READY"
-        );
+        setTimeout(() => {
+            if (this.loadingScreen) {
+                this.loadingScreen.style.opacity = "0";
+                this.loadingScreen.style.pointerEvents = "none";
+                setTimeout(() => {
+                    if (this.loadingScreen) this.loadingScreen.style.display = "none";
+                }, 500);
+            }
+        }, 300);
 
-        setTimeout(
-            () => {
-
-                if (this.loadingScreen) {
-
-                    this.loadingScreen.style.opacity =
-                        "0";
-
-                    this.loadingScreen.style.pointerEvents =
-                        "none";
-
-                    setTimeout(
-                        () => {
-
-                            if (this.loadingScreen) {
-
-                                this.loadingScreen.style.display =
-                                    "none";
-                            }
-
-                        },
-                        500
-                    );
-                }
-
-            },
-            300
-        );
-
+        this.setupUI();
         this.clock.start();
-
-        requestAnimationFrame(
-            this.animate
-        );
+        requestAnimationFrame(this.animate);
 
         console.log("WILD ISLES GAME ENGINE STARTED");
     }
 
     // ============================================================
-    // MAIN GAME LOOP
+    // MAIN GAME LOOP & UPDATES
     // ============================================================
 
     animate() {
-
         requestAnimationFrame(this.animate);
 
         if (this.paused || this.fatalError) return;
@@ -1366,16 +1233,17 @@ class WildIslesGame {
 
         this.updateInput();
         this.updateGame(this.deltaTime, this.elapsedTime);
-        this.updateCamera();
+
+        if (this.thirdPersonCamera && typeof this.thirdPersonCamera.update === "function") {
+            this.thirdPersonCamera.update(this.deltaTime);
+        } else {
+            this.updateCamera();
+        }
+
         this.render();
     }
 
-    // ============================================================
-    // INPUT UPDATE
-    // ============================================================
-
     updateInput() {
-
         if (!this.player) return;
 
         let moveForward = 0;
@@ -1387,9 +1255,7 @@ class WildIslesGame {
         if (this.keys["KeyA"] || this.keys["ArrowLeft"]) moveSide -= 1;
         if (this.keys["KeyD"] || this.keys["ArrowRight"]) moveSide += 1;
 
-        if (this.keys["ShiftLeft"] || this.keys["ShiftRight"]) {
-            isRunning = true;
-        }
+        if (this.keys["ShiftLeft"] || this.keys["ShiftRight"]) isRunning = true;
 
         if (this.mobile && this.joystickActive) {
             moveForward = -this.joystickY;
@@ -1408,19 +1274,16 @@ class WildIslesGame {
         }
     }
 
-    // ============================================================
-    // GAME ENGINE UPDATE
-    // ============================================================
-
     updateGame(delta, elapsedTime) {
+        const yaw = this.thirdPersonCamera ? this.thirdPersonCamera.yaw : this.cameraYaw;
 
         if (this.player && typeof this.player.update === "function") {
-            this.player.update(delta);
+            this.player.update(delta, yaw);
         }
 
         if (this.player && this.terrain) {
-            const playerPos = typeof this.player.getPosition === "function" 
-                ? this.player.getPosition() 
+            const playerPos = typeof this.player.getPosition === "function"
+                ? this.player.getPosition()
                 : this.player.position;
 
             if (playerPos) {
@@ -1442,8 +1305,8 @@ class WildIslesGame {
         }
 
         if (this.environment && typeof this.environment.update === "function") {
-            const playerPos = this.player && typeof this.player.getPosition === "function" 
-                ? this.player.getPosition() 
+            const playerPos = this.player && typeof this.player.getPosition === "function"
+                ? this.player.getPosition()
                 : null;
             this.environment.update(delta, playerPos);
         }
@@ -1461,16 +1324,11 @@ class WildIslesGame {
         this.updateDebugUI();
     }
 
-    // ============================================================
-    // CAMERA FOLLOW & ORBIT
-    // ============================================================
-
     updateCamera() {
-
         if (!this.player || !this.camera) return;
 
-        const playerPos = typeof this.player.getPosition === "function" 
-            ? this.player.getPosition() 
+        const playerPos = typeof this.player.getPosition === "function"
+            ? this.player.getPosition()
             : this.player.position;
 
         if (!playerPos) return;
@@ -1497,23 +1355,17 @@ class WildIslesGame {
         this.camera.lookAt(this.cameraTarget);
     }
 
-    // ============================================================
-    // RENDER
-    // ============================================================
-
     render() {
-
         if (this.renderer && this.scene && this.camera) {
             this.renderer.render(this.scene, this.camera);
         }
     }
 
     // ============================================================
-    // UI UPDATES
+    // UI UPDATES & UTILITY
     // ============================================================
 
     updatePlayerUI() {
-
         if (!this.survival && !this.player) return;
 
         if (this.healthFill) {
@@ -1540,14 +1392,13 @@ class WildIslesGame {
     }
 
     updateWorldUI() {
-
         if (this.worldTime && this.dayNight && typeof this.dayNight.getFormattedTime === "function") {
             this.worldTime.textContent = this.dayNight.getFormattedTime();
         }
 
         if (this.worldLocation && this.player) {
-            const pos = typeof this.player.getPosition === "function" 
-                ? this.player.getPosition() 
+            const pos = typeof this.player.getPosition === "function"
+                ? this.player.getPosition()
                 : this.player.position;
             if (pos) {
                 this.worldLocation.textContent = `X: ${Math.round(pos.x)} | Z: ${Math.round(pos.z)}`;
@@ -1556,7 +1407,6 @@ class WildIslesGame {
     }
 
     updateDebugUI() {
-
         if (!this.debugInfo) return;
 
         const fps = Math.round(1 / Math.max(0.001, this.deltaTime));
@@ -1564,7 +1414,6 @@ class WildIslesGame {
     }
 
     showInteraction(text) {
-
         if (!this.interactionMessage) return;
 
         this.interactionMessage.textContent = text;
@@ -1576,12 +1425,7 @@ class WildIslesGame {
         }, 2000);
     }
 
-    // ============================================================
-    // ERROR HANDLING
-    // ============================================================
-
     showFatalError(error) {
-
         this.fatalError = true;
 
         if (this.loadingText) {
@@ -1593,27 +1437,7 @@ class WildIslesGame {
     }
 }
 
-// ============================================================
-// BOOTSTRAP
-// ============================================================
-
+// Global Bootstrap Entry Point
 window.addEventListener("DOMContentLoaded", () => {
     window.game = new WildIslesGame();
-});   import { ThirdPersonCamera } from "./camera.js";
-
-// Scene setup ke baad:
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 10000);
-const player = new Player(scene, terrain);
-const thirdPersonCamera = new ThirdPersonCamera(camera, player);
-
-// Main Animation Loop:
-function animate(time) {
-    requestAnimationFrame(animate);
-    
-    const deltaTime = clock.getDelta();
-    
-    player.update(deltaTime, thirdPersonCamera.yaw);
-    thirdPersonCamera.update(deltaTime);
-    
-    renderer.render(scene, camera);
-}
+});
