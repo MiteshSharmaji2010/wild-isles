@@ -519,30 +519,81 @@ class WildIslesGame {
         console.log("Lighting READY");
     }
 
-    // ============================================================
-    // TERRAIN
-    // ============================================================
+  // ============================================================
+// TERRAIN
+// ============================================================
 
-    createTerrain() {
+createTerrain() {
 
-        this.terrain =
-            new VeyraTerrain(
-                this.scene
-            );
+    this.terrain =
+        new VeyraTerrain(
+            this.scene
+        );
 
-        if (
-            this.terrain &&
-            typeof this.terrain.enable === "function"
-        ) {
+    // --------------------------------------------------------
+    // TERRAIN COMPATIBILITY
+    // --------------------------------------------------------
+    // environment.js uses getSlopeDegrees()
+    // terrain.js provides getSlopeAngleDegrees()
+    //
+    // Keep both names available so older systems
+    // remain compatible.
+    // --------------------------------------------------------
 
-            this.terrain.enable();
-        }
+    if (
+        this.terrain &&
+        typeof this.terrain.getSlopeDegrees !== "function" &&
+        typeof this.terrain.getSlopeAngleDegrees === "function"
+    ) {
 
-        console.log(
-            "Veyra Terrain READY"
+        this.terrain.getSlopeDegrees =
+            (x, z) => {
+
+                return this.terrain.getSlopeAngleDegrees(
+                    x,
+                    z
+                );
+            };
+    }
+
+    // --------------------------------------------------------
+    // ENABLE TERRAIN STREAMING
+    // --------------------------------------------------------
+
+    if (
+        this.terrain &&
+        typeof this.terrain.enable === "function"
+    ) {
+
+        this.terrain.enable();
+    }
+
+    // --------------------------------------------------------
+    // INITIAL TERRAIN CHUNKS
+    // --------------------------------------------------------
+
+    if (
+        this.terrain &&
+        typeof this.terrain.update === "function"
+    ) {
+
+        this.terrain.update(
+            0,
+            0
         );
     }
 
+    console.log(
+        "Veyra Terrain READY"
+    );
+
+    console.log(
+        "Terrain Slope API:",
+        typeof this.terrain.getSlopeDegrees === "function"
+            ? "READY"
+            : "MISSING"
+    );
+}
     // ============================================================
     // WATER
     // ============================================================
