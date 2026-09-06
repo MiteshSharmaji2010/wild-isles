@@ -9,9 +9,7 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.m
 import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/loaders/GLTFLoader.js";
 
 export class Player {
-
     constructor(scene, terrain, camera = null, soundEngine = null, particleSystem = null) {
-
         this.scene = scene;
         this.terrain = terrain;
         this.camera = camera;
@@ -301,7 +299,9 @@ export class Player {
             inputZ /= length;
         }
         return { x: inputX, z: inputZ, moving: length > 0 };
-    }// ========================================================
+    }
+
+    // ========================================================
     // MAIN UPDATE LOOP & STATE MANAGEMENT
     // ========================================================
 
@@ -405,7 +405,9 @@ export class Player {
         if (this.terrain && typeof this.terrain.update === "function") {
             this.terrain.update(this.object.position.x, this.object.position.z);
         }
-    }// ========================================================
+    }
+
+    // ========================================================
     // PROCEDURAL ANIMATION & ADVANCED LIMB KINEMATICS
     // ========================================================
 
@@ -492,94 +494,9 @@ export class Player {
         this.camera.position.lerp(desiredCameraPos, 10 * deltaTime);
         this.camera.lookAt(targetPos);
     }
-}// ========================================================
-    // PROCEDURAL ANIMATION & ADVANCED LIMB KINEMATICS
-    // ========================================================
+}
 
-    updateProceduralAnimation(deltaTime, moving) {
-        this.animationTime += deltaTime * (this.isRunning ? 12 : 7);
-
-        if (moving && this.isGrounded) {
-            const swing = Math.sin(this.animationTime) * 0.65;
-            if (this.leftArmPivot) this.leftArmPivot.rotation.x = -swing;
-            if (this.rightArmPivot) this.rightArmPivot.rotation.x = swing;
-            if (this.leftLegPivot) this.leftLegPivot.rotation.x = swing;
-            if (this.rightLegPivot) this.rightLegPivot.rotation.x = -swing;
-        } else if (this.isSwimming) {
-            const swimSwing = Math.sin(this.animationTime * 0.8) * 0.85;
-            if (this.leftArmPivot) this.leftArmPivot.rotation.x = -swimSwing;
-            if (this.rightArmPivot) this.rightArmPivot.rotation.x = swimSwing;
-            if (this.leftLegPivot) this.leftLegPivot.rotation.x = swimSwing * 0.5;
-            if (this.rightLegPivot) this.rightLegPivot.rotation.x = -swimSwing * 0.5;
-        } else {
-            // Idle state & smooth limb dampening
-            const idle = Math.sin(this.animationTime * 0.2) * 0.018;
-            if (this.bodyGroup) this.bodyGroup.position.y = idle;
-            if (this.leftArmPivot) this.leftArmPivot.rotation.x = THREE.MathUtils.lerp(this.leftArmPivot.rotation.x, 0, 10 * deltaTime);
-            if (this.rightArmPivot) this.rightArmPivot.rotation.x = THREE.MathUtils.lerp(this.rightArmPivot.rotation.x, 0, 10 * deltaTime);
-            if (this.leftLegPivot) this.leftLegPivot.rotation.x = THREE.MathUtils.lerp(this.leftLegPivot.rotation.x, 0, 10 * deltaTime);
-            if (this.rightLegPivot) this.rightLegPivot.rotation.x = THREE.MathUtils.lerp(this.rightLegPivot.rotation.x, 0, 10 * deltaTime);
-        }
-    }
-
-    // ========================================================
-    // AUDIO ENGINE & FOOTSTEP SYNTHESIS
-    // ========================================================
-
-    playFootstepSound() {
-        if (this.soundEngine && typeof this.soundEngine.playFootstep === "function") {
-            this.soundEngine.playFootstep(this.object.position);
-            return;
-        }
-
-        // Procedural WebAudio Synthesis
-        try {
-            if (!this.audioCtx) {
-                const AudioContext = window.AudioContext || window.webkitAudioContext;
-                if (AudioContext) this.audioCtx = new AudioContext();
-            }
-            if (this.audioCtx && this.audioCtx.state === "running") {
-                const osc = this.audioCtx.createOscillator();
-                const gain = this.audioCtx.createGain();
-                osc.type = "triangle";
-                osc.frequency.setValueAtTime(120, this.audioCtx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(30, this.audioCtx.currentTime + 0.08);
-                gain.gain.setValueAtTime(0.15, this.audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, this.audioCtx.currentTime + 0.08);
-                osc.connect(gain);
-                gain.connect(this.audioCtx.destination);
-                osc.start();
-                osc.stop(this.audioCtx.currentTime + 0.08);
-            }
-        } catch (e) {
-            // Mute fallback
-        }
-
-        // Trigger Dust Particles on Footstep
-        if (this.particleSystem && typeof this.particleSystem.spawnDust === "function") {
-            this.particleSystem.spawnDust(this.object.position);
-        }
-    }
-
-    // ========================================================
-    // THIRD PERSON CAMERA FOLLOW SYSTEM
-    // ========================================================
-
-    updateThirdPersonCamera(deltaTime) {
-        if (!this.camera) return;
-
-        const targetPos = this.object.position.clone().add(new THREE.Vector3(0, this.cameraHeight, 0));
-        const offset = new THREE.Vector3(
-            Math.sin(this.cameraRotation) * this.cameraDistance,
-            0,
-            Math.cos(this.cameraRotation) * this.cameraDistance
-        );
-
-        const desiredCameraPos = targetPos.clone().add(offset);
-        this.camera.position.lerp(desiredCameraPos, 10 * deltaTime);
-        this.camera.lookAt(targetPos);
-    }
-}v// ============================================================
+// ============================================================
 // WILD ISLES GAME ENGINE & WORLD SYSTEMS
 // WORLD TERRAIN, PROCEDURAL FOLIAGE & ATMOSPHERE
 // ============================================================
