@@ -673,3 +673,8 @@ export class TerrainSystem {
         this.scene.remove(this.root);
     }
 }
+const terrainMaterial = new THREE.MeshStandardMaterial({
+    color: 0x3d8c40, // Green grass tint
+    roughness: 0.8,  // Zameen ko non-reflective banane ke liye
+    metalness: 0.1
+});
