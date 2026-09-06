@@ -1350,3 +1350,6 @@ export class VeyraEnvironment {
         this.grassMaterial.dispose();
     }
 }
+// Distance-based Fog (Color, Density)
+scene.fog = new THREE.FogExp2(0xcce0ff, 0.015);
+renderer.setClearColor(0xcce0ff); // Sky color ko fog se match karein
