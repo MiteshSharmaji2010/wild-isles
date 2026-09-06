@@ -213,3 +213,18 @@ export class DayNightSystem {
         if (this.hemiLight) this.scene.remove(this.hemiLight);
     }
 }
+// Directional Light (Suraj ki roshni)
+const sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
+sunLight.position.set(50, 100, 50);
+sunLight.castShadow = true;
+
+// Shadow quality aur resolution High Karein
+sunLight.shadow.mapSize.width = 2048;
+sunLight.shadow.mapSize.height = 2048;
+sunLight.shadow.camera.near = 0.5;
+sunLight.shadow.camera.far = 500;
+scene.add(sunLight);
+
+// Soft Ambient Light (Shadows ko bilkul kaala hone se bachane ke liye)
+const ambientLight = new THREE.AmbientLight(0xddeeff, 0.4);
+scene.add(ambientLight);
