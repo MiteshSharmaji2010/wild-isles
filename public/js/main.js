@@ -1441,3 +1441,5 @@ export class WildIslesGame {
 window.addEventListener("DOMContentLoaded", () => {
     window.game = new WildIslesGame();
 });
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Soft realistic shadows
