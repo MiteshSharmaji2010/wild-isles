@@ -1353,3 +1353,11 @@ export class VeyraEnvironment {
 // Distance-based Fog (Color, Density)
 scene.fog = new THREE.FogExp2(0xcce0ff, 0.015);
 renderer.setClearColor(0xcce0ff); // Sky color ko fog se match karein
+// Sky Geometry ko bada karein aur Material side fix karein
+const skyGeo = new THREE.SphereGeometry(500, 32, 32);
+const skyMat = new THREE.MeshBasicMaterial({
+    color: 0x87ceeb,
+    side: THREE.BackSide // Taaki andar se sahi dikhe
+});
+const sky = new THREE.Mesh(skyGeo, skyMat);
+scene.add(sky);
