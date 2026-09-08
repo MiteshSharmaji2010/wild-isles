@@ -47,7 +47,11 @@ export class WorldTerrain {
         return h1 + h2;
     }
 
-    // Alias helper methods for player.js compatibility
+    // Helper methods required by player.js
+    getGroundHeight(x, z) {
+        return this.getHeightAt(x, z);
+    }
+
     getTerrainHeight(x, z) {
         return this.getHeightAt(x, z);
     }
