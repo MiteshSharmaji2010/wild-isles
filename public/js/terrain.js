@@ -47,6 +47,18 @@ export class WorldTerrain {
         return h1 + h2;
     }
 
+    // Alias helper methods for player.js compatibility
+    getTerrainHeight(x, z) {
+        return this.getHeightAt(x, z);
+    }
+
+    findSafePosition(targetX = 0, targetZ = 0) {
+        const height = this.getHeightAt(targetX, targetZ);
+        // Guarantee player spawns safely above water (water level is -1)
+        const safeY = Math.max(height, 0.5);
+        return new THREE.Vector3(targetX, safeY, targetZ);
+    }
+
     createTerrain() {
         const size = 300;
         const segments = 120;
@@ -131,7 +143,7 @@ export class WorldTerrain {
         const size = 0.8 + Math.random() * 0.8;
         const rockGeo = new THREE.DodecahedronGeometry(size, 1);
         
-        // Slightly deform vertices for organic look
+        // Deform vertices for organic look
         const posAttr = rockGeo.attributes.position;
         for (let i = 0; i < posAttr.count; i++) {
             posAttr.setX(i, posAttr.getX(i) + (Math.random() - 0.5) * 0.2);
@@ -200,7 +212,6 @@ export class WorldTerrain {
     }
 
     update(playerX, playerZ) {
-        // Keeps directional sunlight focused around player position for crisp shadow optimization
         if (this.sunlight) {
             this.sunlight.position.x = playerX + 80;
             this.sunlight.position.z = playerZ + 40;
