@@ -1,1 +1,46 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wild Isles - 3D Game</title>
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Import Maps for Three.js and Addons -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+    <!-- Game Canvas Element -->
+    <canvas id="game-canvas"></canvas>
 
+    <!-- UI Overlay / HUD -->
+    <div id="ui-container">
+        <div id="stats-panel">
+            <div class="stat-bar">
+                <span class="stat-label">Health:</span>
+                <div class="bar-outer"><div id="health-bar" class="bar-fill health"></div></div>
+            </div>
+            <div class="stat-bar">
+                <span class="stat-label">Stamina:</span>
+                <div class="bar-outer"><div id="stamina-bar" class="bar-fill stamina"></div></div>
+            </div>
+        </div>
+
+        <div id="controls-hint">
+            <p><strong>W A S D</strong> - Move</p>
+            <p><strong>SHIFT</strong> - Run | <strong>SPACE</strong> - Jump</p>
+            <p><strong>CTRL</strong> - Crouch</p>
+        </div>
+    </div>
+
+    <!-- Main Game Script Module -->
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
