@@ -75,7 +75,9 @@ class Game {
     }
 }
 
-// Launch Game on Page Load
-window.addEventListener("DOMContentLoaded", () => {
+// Launch Game Safely After Canvas Loads
+if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', () => new Game());
+} else {
     new Game();
-});
+}
